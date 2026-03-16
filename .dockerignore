@@ -1,0 +1,6 @@
+node_modules
+.git
+client/src
+server/*.ts
+shared
+*.md
