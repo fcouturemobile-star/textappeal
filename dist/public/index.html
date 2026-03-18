@@ -1382,7 +1382,6 @@ if (document.readyState === "loading") {
     sizeGrid(grid, row);
 
     // Safari fix: force min-height:0 on all flex-1 content divs inside columns
-    // Safari's min-height:auto default prevents flex children from shrinking
     var contentDivs = grid.querySelectorAll('.flex-1.overflow-auto');
     for (var c = 0; c < contentDivs.length; c++) {
       contentDivs[c].style.minHeight = '0';
@@ -1397,7 +1396,7 @@ if (document.readyState === "loading") {
       btnSlot.appendChild(btnBar);
     }
 
-    // Move TM/Glossary panel
+    // Move TM/Glossary panel into bottom row
     var tmHdr = document.querySelector('[data-testid="button-toggle-details"]');
     if (tmHdr) {
       var tmPanel = tmHdr.parentElement;
@@ -1414,7 +1413,7 @@ if (document.readyState === "loading") {
       }
     }
 
-    // Move Principles panel
+    // Move Principles panel into bottom row
     var prHdr = document.querySelector('[data-testid="button-toggle-principles"]');
     if (prHdr) {
       var prPanel = prHdr.parentElement;
@@ -1424,6 +1423,26 @@ if (document.readyState === "loading") {
         if (prContent) prContent.style.cssText = 'flex:1 1 0%;min-height:0;overflow-y:auto;max-height:none;';
         row.appendChild(prPanel);
       }
+    }
+
+    // AFTER moving, hide any REMAINING TM/Glossary/Principles panels still
+    // inside the grid columns. React re-creates them on re-render, and the
+    // duplicates steal space from result panes (the clipping bug).
+    var inGridTM = grid.querySelectorAll('[data-testid="button-toggle-details"]');
+    for (var t = 0; t < inGridTM.length; t++) {
+      var wrapper = inGridTM[t].closest('.border-t');
+      if (wrapper) wrapper.style.display = 'none';
+    }
+    var inGridPR = grid.querySelectorAll('[data-testid="button-toggle-principles"]');
+    for (var p = 0; p < inGridPR.length; p++) {
+      var wrapperP = inGridPR[p].closest('.border-t');
+      if (wrapperP) wrapperP.style.display = 'none';
+    }
+    // Also hide the button bar wrapper left behind in column 1
+    var inGridBtn = grid.querySelectorAll('[data-testid="button-translate"]');
+    for (var b = 0; b < inGridBtn.length; b++) {
+      var btnWrapper = inGridBtn[b].closest('.border-t');
+      if (btnWrapper) btnWrapper.style.display = 'none';
     }
   }
 
