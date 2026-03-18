@@ -1,0 +1,12 @@
+{
+  "adminUsername": "admin",
+  "adminPasswordHash": "17616c919017c2236b11de40925a8b227186509be65b23c6518776aa0c448a38",
+  "llm": {
+    "providerType": "anthropic",
+    "endpoint": "https://api.anthropic.com/v1/messages",
+    "apiKey": "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",
+    "model": "claude-sonnet-4-6-20260205",
+    "temperature": 0.3
+  },
+  "customStylePrinciples": ""
+}

@@ -1265,8 +1265,7 @@ if (document.readyState === "loading") {
   var ROW_ID  = 'ta-bottom-panels';
   var LEFT_ID = 'ta-bottom-left';
   var CARD    = 'display:flex;flex-direction:column;overflow:hidden;border-radius:8px;border:1px solid hsl(var(--border));background:hsl(var(--card));padding:10px 14px;';
-  var PHOTO   = document.querySelector('.ta-splash-photo');
-  var photoSrc = PHOTO ? PHOTO.src : '';
+  var photoSrc = 'data:image/jpeg;base64,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';
 
   function buildLeftPane() {
     var pane = document.createElement('div');
@@ -1301,9 +1300,12 @@ if (document.readyState === "loading") {
 
     // Make parent a flex-column so grid + bottom row stack
     var parent = grid.parentElement;
-    if (parent && parent.style.display !== 'flex') {
-      parent.style.cssText += ';display:flex!important;flex-direction:column!important;';
-      grid.style.cssText += ';flex:1 1 0%;min-height:0;';
+    if (parent) {
+      parent.style.display = 'flex';
+      parent.style.flexDirection = 'column';
+      grid.style.flex = '1 1 0%';
+      grid.style.minHeight = '0';
+      grid.style.setProperty('height', 'auto', 'important');
     }
 
     // Find or create the bottom row
