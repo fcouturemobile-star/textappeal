@@ -1278,8 +1278,8 @@ if (document.readyState === "loading") {
         const col = tmSection.parentElement;
         col.style.cssText += ';display:flex!important;flex-direction:column!important;';
         const resultArea = col.querySelector('.flex-1.overflow-auto');
-        if (resultArea) resultArea.style.cssText += ';flex:2 1 0%!important;min-height:0!important;';
-        tmSection.style.cssText += ';flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;';
+        if (resultArea) resultArea.style.cssText += ';flex:7 1 0%!important;min-height:0!important;';
+        tmSection.style.cssText += ';flex:3 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;';
       }
       // Always keep content div filling available space (even after re-renders)
       const cd = tmSection && tmSection.querySelector('.ta-tm-glossary-content, .px-3.pb-2');
@@ -1299,8 +1299,8 @@ if (document.readyState === "loading") {
         const col = princSection.parentElement;
         col.style.cssText += ';display:flex!important;flex-direction:column!important;';
         const resultArea = col.querySelector('.flex-1.overflow-auto');
-        if (resultArea) resultArea.style.cssText += ';flex:2 1 0%!important;min-height:0!important;';
-        princSection.style.cssText += ';flex:1 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;';
+        if (resultArea) resultArea.style.cssText += ';flex:7 1 0%!important;min-height:0!important;';
+        princSection.style.cssText += ';flex:3 1 0%!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;';
       }
       const cd = princSection && princSection.querySelector('.px-3.pb-3');
       if (cd) cd.style.cssText += ';flex:1 1 0%!important;min-height:0!important;overflow-y:auto!important;';

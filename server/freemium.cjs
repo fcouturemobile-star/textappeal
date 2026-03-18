@@ -13,7 +13,60 @@ try { nodemailer = require('nodemailer'); } catch(e) { console.log('nodemailer n
 // ─── Base directory (works regardless of process.cwd) ───────────────
 const BASE_DIR = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(BASE_DIR, 'server');
-const DATA_DIR = path.join(SERVER_DIR, 'data');
+const LOCAL_DATA_DIR = path.join(SERVER_DIR, 'data');
+
+// ─── Persistent data directory (survives redeployments) ────────────
+const HOME_DATA_DIR = path.join(process.env.HOME || process.env.USERPROFILE || '/tmp', '.textappeal');
+
+// Ensure persistent dir exists
+try { fs.mkdirSync(HOME_DATA_DIR, { recursive: true }); } catch(e) {}
+
+// Migrate existing data files from local to persistent dir on first run
+function migrateDataFiles() {
+  const files = ['admin-config.json', 'db-config.json', 'memory.tmx', 'glossary.csv'];
+  for (const file of files) {
+    const localPath = path.join(LOCAL_DATA_DIR, file);
+    const persistPath = path.join(HOME_DATA_DIR, file);
+    // Only migrate if local exists and persistent does NOT
+    if (fs.existsSync(localPath) && !fs.existsSync(persistPath)) {
+      try {
+        fs.copyFileSync(localPath, persistPath);
+        console.log(`Migrated ${file} to persistent storage: ${persistPath}`);
+      } catch(e) {
+        console.error(`Failed to migrate ${file}:`, e.message);
+      }
+    }
+  }
+}
+migrateDataFiles();
+
+// DATA_DIR resolves to persistent dir if it exists and has files, otherwise local
+// This ensures the app always finds its config even after a fresh deploy
+function resolveDataFile(filename) {
+  const persistPath = path.join(HOME_DATA_DIR, filename);
+  if (fs.existsSync(persistPath)) return persistPath;
+  const localPath = path.join(LOCAL_DATA_DIR, filename);
+  if (fs.existsSync(localPath)) return localPath;
+  // Default to persistent dir for new files
+  return persistPath;
+}
+
+// For writes, always use persistent dir
+function writeDataFile(filename, content) {
+  const persistPath = path.join(HOME_DATA_DIR, filename);
+  fs.mkdirSync(path.dirname(persistPath), { recursive: true });
+  fs.writeFileSync(persistPath, content);
+  // Also write to local dir as backup
+  try {
+    fs.mkdirSync(LOCAL_DATA_DIR, { recursive: true });
+    fs.writeFileSync(path.join(LOCAL_DATA_DIR, filename), content);
+  } catch(e) {}
+  return persistPath;
+}
+
+// Keep DATA_DIR for backward compat but prefer persistent
+const DATA_DIR = HOME_DATA_DIR;
+console.log('Persistent data dir:', HOME_DATA_DIR);
 
 // ─── SMTP Email Helper ──────────────────────────────────────────────
 function getSmtpConfig() {
@@ -84,9 +137,10 @@ function getDbConfig() {
     };
   }
 
-  // Priority 2: Config file (try multiple locations)
+  // Priority 2: Config file (try multiple locations -- persistent dir first)
   const locations = [
-    path.join(DATA_DIR, 'db-config.json'),
+    path.join(HOME_DATA_DIR, 'db-config.json'),
+    path.join(LOCAL_DATA_DIR, 'db-config.json'),
     path.join(process.cwd(), 'server', 'data', 'db-config.json'),
     path.join(__dirname, 'data', 'db-config.json')
   ];
@@ -878,7 +932,6 @@ function registerFreemiumRoutes(app) {
     if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
 
     const { host, port, user, password, database } = req.body;
-    const cfgPath = path.join(DATA_DIR, 'db-config.json');
 
     try {
       const current = getDbConfig();
@@ -890,8 +943,8 @@ function registerFreemiumRoutes(app) {
         database: database || current.database
       };
 
-      fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
-      fs.writeFileSync(cfgPath, JSON.stringify(newCfg, null, 2));
+      // Save to persistent dir (survives redeployments) + local backup
+      writeDataFile('db-config.json', JSON.stringify(newCfg, null, 2));
 
       // Reset pool to reconnect
       if (pool) {
