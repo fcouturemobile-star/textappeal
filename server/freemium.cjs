@@ -7,11 +7,66 @@
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
+let nodemailer;
+try { nodemailer = require('nodemailer'); } catch(e) { console.log('nodemailer not installed — email sending disabled'); }
 
 // ─── Base directory (works regardless of process.cwd) ───────────────
 const BASE_DIR = path.resolve(__dirname, '..');
 const SERVER_DIR = path.join(BASE_DIR, 'server');
 const DATA_DIR = path.join(SERVER_DIR, 'data');
+
+// ─── SMTP Email Helper ──────────────────────────────────────────────
+function getSmtpConfig() {
+  try {
+    const cfgPath = path.join(DATA_DIR, 'admin-config.json');
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      return cfg.smtp || null;
+    }
+  } catch (e) { console.error('Error reading SMTP config:', e.message); }
+  return null;
+}
+
+function saveSmtpConfig(smtpCfg) {
+  const cfgPath = path.join(DATA_DIR, 'admin-config.json');
+  let cfg = {};
+  try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch(e) {}
+  cfg.smtp = smtpCfg;
+  fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+  fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+}
+
+async function sendEmail(to, subject, html) {
+  if (!nodemailer) {
+    console.error('Cannot send email: nodemailer not installed');
+    return false;
+  }
+  const smtp = getSmtpConfig();
+  if (!smtp || !smtp.host || !smtp.user || !smtp.pass) {
+    console.error('Cannot send email: SMTP not configured (admin panel > Email/SMTP tab)');
+    return false;
+  }
+  try {
+    const transporter = nodemailer.createTransport({
+      host: smtp.host,
+      port: parseInt(smtp.port) || 465,
+      secure: parseInt(smtp.port) === 465,
+      auth: { user: smtp.user, pass: smtp.pass },
+      tls: { rejectUnauthorized: false }
+    });
+    await transporter.sendMail({
+      from: smtp.from || smtp.user,
+      to,
+      subject,
+      html
+    });
+    console.log(`Email sent to ${to}: ${subject}`);
+    return true;
+  } catch (e) {
+    console.error('Email send error:', e.message);
+    return false;
+  }
+}
 
 // ─── MySQL Connection Pool ──────────────────────────────────────────
 let pool = null;
@@ -567,10 +622,28 @@ function registerFreemiumRoutes(app) {
 
       await db.query('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)', [users[0].id, resetToken, expiresAt]);
 
-      // Log the reset link (admin can see it in server logs; email sending can be added later)
       const baseUrl = req.headers.origin || `${req.protocol}://${req.headers.host}`;
       const resetLink = `${baseUrl}/#/reset-password?token=${resetToken}`;
       console.log(`[Password Reset] User: ${users[0].email}, Link: ${resetLink}`);
+
+      // Send reset email via SMTP
+      const emailSent = await sendEmail(
+        users[0].email,
+        'Text Appeal - Password Reset',
+        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#1e40af;margin-bottom:16px">Password Reset</h2>
+          <p>You requested a password reset for your Text Appeal account.</p>
+          <p>Click the button below to set a new password. This link expires in 1 hour.</p>
+          <p style="text-align:center;margin:32px 0">
+            <a href="${resetLink}" style="background:#2563eb;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Reset Password</a>
+          </p>
+          <p style="font-size:13px;color:#666">If you did not request this, you can safely ignore this email.</p>
+          <p style="font-size:12px;color:#999;margin-top:24px">If the button doesn't work, copy and paste this link into your browser:<br>${resetLink}</p>
+        </div>`
+      );
+      if (!emailSent) {
+        console.log('[Password Reset] Email not sent (SMTP not configured). Token logged above.');
+      }
 
       res.json({ ok: true, message: 'If that email exists, a reset link has been sent.' });
     } catch (e) {
@@ -976,6 +1049,64 @@ function registerFreemiumRoutes(app) {
       monthlyPriceCad: cfg.monthly_price_cad || 20,
       publishableKey: cfg.publishable_key || ''
     });
+  });
+
+  // ── Admin: Get SMTP config ──
+  app.get('/api/admin/smtp-config', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const smtp = getSmtpConfig() || {};
+    res.json({
+      host: smtp.host || 'smtp.hostinger.com',
+      port: smtp.port || 465,
+      user: smtp.user || '',
+      pass: smtp.pass ? '****' : '',
+      from: smtp.from || smtp.user || ''
+    });
+  });
+
+  // ── Admin: Save SMTP config ──
+  app.post('/api/admin/smtp-config', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { host, port, user, pass, from } = req.body;
+    try {
+      const current = getSmtpConfig() || {};
+      const newCfg = {
+        host: host || current.host || 'smtp.hostinger.com',
+        port: port || current.port || 465,
+        user: user || current.user || '',
+        pass: pass && pass !== '****' ? pass : current.pass || '',
+        from: from || current.from || user || current.user || ''
+      };
+      saveSmtpConfig(newCfg);
+      res.json({ ok: true, message: 'SMTP configuration saved' });
+    } catch (e) {
+      console.error('Save SMTP config error:', e.message);
+      res.status(500).json({ error: 'Failed to save SMTP config' });
+    }
+  });
+
+  // ── Admin: Test SMTP connection ──
+  app.post('/api/admin/smtp-test', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { testEmail } = req.body;
+    if (!testEmail) return res.status(400).json({ error: 'testEmail required' });
+
+    const ok = await sendEmail(
+      testEmail,
+      'Text Appeal - SMTP Test',
+      '<div style="font-family:sans-serif;padding:24px"><h2 style="color:#1e40af">SMTP is working</h2><p>This is a test email from your Text Appeal application. If you received this, your email configuration is correct.</p></div>'
+    );
+    if (ok) {
+      res.json({ ok: true, message: `Test email sent to ${testEmail}` });
+    } else {
+      res.status(500).json({ error: 'Failed to send test email. Check SMTP credentials and server logs.' });
+    }
   });
 }
 

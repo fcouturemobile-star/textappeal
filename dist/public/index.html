@@ -670,6 +670,12 @@ function injectAdminSections() {
         '<p style="color:var(--muted-foreground,#64748b);font-size:14px;margin:0 0 16px">Configure database connection for user accounts and usage tracking</p>' +
         '<div id="ta-db-content"><button class="ta-btn ta-btn-primary" onclick="window.__taFreemium.showDatabasePanel()">Configure Database</button></div>' +
         '</div>' +
+        '<div class="shadcn-card rounded-xl border bg-card border-card-border text-card-foreground shadow-sm" style="margin-top:16px;padding:24px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' +
+        '<h3 style="font-size:18px;font-weight:600;margin:0">Email / SMTP</h3></div>' +
+        '<p style="color:var(--muted-foreground,#64748b);font-size:14px;margin:0 0 16px">Configure outgoing email for password resets and notifications</p>' +
+        '<div id="ta-smtp-content"><button class="ta-btn ta-btn-primary" onclick="window.__taFreemium.showSmtpPanel()">Configure Email</button></div>' +
+        '</div>' +
         '</div>';
 
       container.appendChild(sections);
@@ -876,6 +882,100 @@ async function initDb() {
     }
   } catch(e) {
     if (msg) { msg.textContent = "Error: " + e.message; msg.style.color = "#ef4444"; }
+  }
+}
+
+async function showSmtpPanel() {
+  const adminToken = getAdminToken();
+  if (!adminToken) return;
+
+  let panel = document.getElementById("ta-smtp-content");
+  if (!panel) return;
+  panel.innerHTML = '<p>Loading SMTP config...</p>';
+
+  try {
+    const r = await origFetch("/api/admin/smtp-config", { headers: { "x-admin-token": adminToken } });
+    const cfg = r.ok ? await r.json() : {};
+
+    panel.innerHTML = '<h3>Email / SMTP Configuration</h3>' +
+      '<form id="ta-smtp-form" onsubmit="return false;" class="ta-admin-form">' +
+      '<div class="ta-form-row"><label>SMTP Host</label><input type="text" id="ta-smtp-host" value="' + escAttr(cfg.host || 'smtp.hostinger.com') + '"></div>' +
+      '<div class="ta-form-row"><label>Port</label><input type="number" id="ta-smtp-port" value="' + (cfg.port || 465) + '"></div>' +
+      '<div class="ta-form-row"><label>Username (email)</label><input type="text" id="ta-smtp-user" value="' + escAttr(cfg.user || '') + '" placeholder="noreply@textappeal.pro"></div>' +
+      '<div class="ta-form-row"><label>Password</label><input type="password" id="ta-smtp-pass" value="' + escAttr(cfg.pass || '') + '"></div>' +
+      '<div class="ta-form-row"><label>From address</label><input type="text" id="ta-smtp-from" value="' + escAttr(cfg.from || '') + '" placeholder="noreply@textappeal.pro (defaults to username)"></div>' +
+      '<div id="ta-smtp-msg" class="ta-form-msg"></div>' +
+      '<button type="submit" class="ta-btn ta-btn-primary">Save SMTP Settings</button>' +
+      ' <button type="button" class="ta-btn ta-btn-secondary" id="ta-smtp-test-btn">Send Test Email</button>' +
+      '</form>' +
+      '<div class="ta-admin-hint"><strong>Hostinger SMTP Setup:</strong><ol>' +
+      '<li>Go to Hostinger hPanel &rarr; Emails &rarr; Manage</li>' +
+      '<li>Create an email account (e.g. noreply@textappeal.pro)</li>' +
+      '<li>Use <strong>smtp.hostinger.com</strong> as the host</li>' +
+      '<li>Port <strong>465</strong> (SSL) or <strong>587</strong> (TLS)</li>' +
+      '<li>Enter the email address as username and its password</li>' +
+      '<li>Click "Send Test Email" to verify it works</li>' +
+      '</ol></div>';
+
+    panel.querySelector("#ta-smtp-form").addEventListener("submit", async function() {
+      const msg = panel.querySelector("#ta-smtp-msg");
+      msg.textContent = "Saving...";
+      msg.style.color = "#888";
+      try {
+        const r = await origFetch("/api/admin/smtp-config", {
+          method: "POST",
+          headers: { "x-admin-token": adminToken, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            host: panel.querySelector("#ta-smtp-host").value,
+            port: parseInt(panel.querySelector("#ta-smtp-port").value) || 465,
+            user: panel.querySelector("#ta-smtp-user").value,
+            pass: panel.querySelector("#ta-smtp-pass").value,
+            from: panel.querySelector("#ta-smtp-from").value
+          })
+        });
+        const data = await r.json();
+        msg.textContent = data.ok ? "SMTP settings saved!" : (data.error || "Save failed");
+        msg.style.color = data.ok ? "#10b981" : "#ef4444";
+      } catch(e) {
+        msg.textContent = "Error: " + e.message;
+        msg.style.color = "#ef4444";
+      }
+    });
+
+    panel.querySelector("#ta-smtp-test-btn").addEventListener("click", async function() {
+      const testEmail = prompt("Send test email to:", panel.querySelector("#ta-smtp-user").value || "");
+      if (!testEmail) return;
+      const msg = panel.querySelector("#ta-smtp-msg");
+      msg.textContent = "Sending test email...";
+      msg.style.color = "#888";
+      try {
+        // Save first, then test
+        await origFetch("/api/admin/smtp-config", {
+          method: "POST",
+          headers: { "x-admin-token": adminToken, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            host: panel.querySelector("#ta-smtp-host").value,
+            port: parseInt(panel.querySelector("#ta-smtp-port").value) || 465,
+            user: panel.querySelector("#ta-smtp-user").value,
+            pass: panel.querySelector("#ta-smtp-pass").value,
+            from: panel.querySelector("#ta-smtp-from").value
+          })
+        });
+        const r = await origFetch("/api/admin/smtp-test", {
+          method: "POST",
+          headers: { "x-admin-token": adminToken, "Content-Type": "application/json" },
+          body: JSON.stringify({ testEmail: testEmail })
+        });
+        const data = await r.json();
+        msg.textContent = data.ok ? data.message : (data.error || "Test failed");
+        msg.style.color = data.ok ? "#10b981" : "#ef4444";
+      } catch(e) {
+        msg.textContent = "Error: " + e.message;
+        msg.style.color = "#ef4444";
+      }
+    });
+  } catch(e) {
+    panel.innerHTML = '<h3>Email / SMTP Configuration</h3><p style="color:#ef4444">Error: ' + escHtml(e.message) + '</p>';
   }
 }
 
@@ -1112,7 +1212,7 @@ async function doCancelSubscription() {
 
 // ═══ Export for onclick handlers ═══
 window.__taFreemium = {
-  showAuthModal, doLogout, doSubscribe, showMembersPanel, showStripePanel, showDatabasePanel,
+  showAuthModal, doLogout, doSubscribe, showMembersPanel, showStripePanel, showDatabasePanel, showSmtpPanel,
   updateMemberPlan, toggleMember, deleteMember, initDb,
   updateUI, renderLangToggle, renderCreativitySlider, setCreativity,
   showLostPasswordModal, doCancelSubscription
@@ -1160,35 +1260,52 @@ if (document.readyState === "loading") {
 </script>
 
 <script>
-// ═══ Fix: Collapse TM/Glossary by default + reduce max-height ═══
+// ═══ Fix: TM/Glossary + Principles panels take bottom third, no clipping ═══
 (function() {
-  function collapseTMGlossary() {
-    // Auto-collapse TM/Glossary details when they appear
-    const observer = new MutationObserver(function() {
-      const toggleBtn = document.querySelector('[data-testid="button-toggle-details"]');
-      if (toggleBtn) {
-        // Check if the details section is expanded (sibling div visible)
-        const parent = toggleBtn.parentElement;
-        if (parent) {
-          const detailsDiv = parent.querySelector('.px-3.pb-2');
-          if (detailsDiv && !detailsDiv.hasAttribute('data-ta-collapsed')) {
-            // Click to collapse if open
-            detailsDiv.setAttribute('data-ta-collapsed', '1');
-            // Reduce max-height when expanded
-            detailsDiv.style.maxHeight = '120px';
-          }
-        }
-      }
-    });
-    const root = document.getElementById('root');
-    if (root) observer.observe(root, { childList: true, subtree: true });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', collapseTMGlossary);
-  } else {
-    collapseTMGlossary();
-  }
+  // Inject CSS for the layout
+  const style = document.createElement('style');
+  style.textContent = `
+    /* Make each result column a flex column so bottom panels take ~1/3 */
+    .grid.grid-cols-1.lg\\:grid-cols-3 > div {
+      display: flex !important;
+      flex-direction: column !important;
+    }
+    /* The result text area (flex-1 overflow-auto) gets ~2/3 */
+    .grid.grid-cols-1.lg\\:grid-cols-3 > div > .flex-1.overflow-auto {
+      flex: 2 1 0% !important;
+      min-height: 0 !important;
+    }
+    /* The TM/Glossary bottom section (border-t border-border) takes ~1/3 */
+    .grid.grid-cols-1.lg\\:grid-cols-3 > div > .border-t.border-border:last-child {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+    /* The TM/Glossary content area fills the remaining space */
+    .ta-tm-glossary-content {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow-y: auto !important;
+    }
+    /* Principles section also takes ~1/3 */
+    .grid.grid-cols-1.lg\\:grid-cols-3 > div:last-child > .border-t.border-border:last-child {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      display: flex !important;
+      flex-direction: column !important;
+      overflow: hidden !important;
+    }
+    /* Principles content scrollable */
+    .grid.grid-cols-1.lg\\:grid-cols-3 > div:last-child > .border-t.border-border:last-child > .px-3.pb-3 {
+      flex: 1 1 0% !important;
+      min-height: 0 !important;
+      overflow-y: auto !important;
+    }
+  `;
+  document.head.appendChild(style);
 })();
 
 // ═══ Fix: Clean up Word paste line breaks ═══
