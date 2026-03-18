@@ -1260,29 +1260,67 @@ if (document.readyState === "loading") {
 </script>
 
 <script>
-// ═══ Fix: TM/Glossary + Principles -- fixed 350px via inline styles ═══
+// ═══ Fix: Move TM/Glossary + Principles into a separate row below the columns ═══
 (function() {
-  var PANEL_H = '350px';
-  function fixPanels() {
-    ['button-toggle-details','button-toggle-principles'].forEach(function(tid) {
-      var hdr = document.querySelector('[data-testid="' + tid + '"]');
-      if (!hdr) return;
-      var panel = hdr.parentElement;  // the border-t wrapper
-      if (!panel) return;
-      var s = panel.style;
-      if (s.height === PANEL_H) return; // already fixed
-      s.cssText = 'flex:0 0 '+PANEL_H+'!important;height:'+PANEL_H+'!important;max-height:'+PANEL_H+'!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important;';
-      // Make content area inside scrollable and fill remaining space
-      var content = panel.querySelector('.ta-tm-glossary-content') || panel.querySelector('.px-3.pb-3');
-      if (content) {
-        content.style.cssText = 'flex:1 1 0%!important;min-height:0!important;max-height:none!important;overflow-y:auto!important;';
-      }
-    });
+  var ROW_ID = 'ta-bottom-panels';
+
+  function relocatePanels() {
+    var tmHdr   = document.querySelector('[data-testid="button-toggle-details"]');
+    var prHdr   = document.querySelector('[data-testid="button-toggle-principles"]');
+    // Nothing to move yet
+    if (!tmHdr && !prHdr) return;
+
+    var tmPanel  = tmHdr ? tmHdr.parentElement : null;   // border-t wrapper
+    var prPanel  = prHdr ? prHdr.parentElement : null;
+
+    // Find or create the bottom row
+    var row = document.getElementById(ROW_ID);
+    if (!row) {
+      // Find the grid that holds the 3 columns
+      var grid = document.querySelector('.grid.lg\\:grid-cols-3') || document.querySelector('[class*="lg:grid-cols-3"]');
+      if (!grid) return;
+      row = document.createElement('div');
+      row.id = ROW_ID;
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr;gap:12px;height:200px;min-height:200px;max-height:200px;margin-top:8px;';
+      // Insert after the grid, inside the same parent
+      grid.parentElement.insertBefore(row, grid.nextSibling);
+      // Shrink the main grid so everything fits on screen
+      grid.style.cssText += ';flex:1 1 0%;min-height:0;';
+      // The parent needs to be flex-column so grid + row stack
+      grid.parentElement.style.cssText += ';display:flex!important;flex-direction:column!important;';
+    }
+
+    // Move TM/Glossary panel if not already in the row
+    if (tmPanel && tmPanel.parentElement !== row) {
+      tmPanel.style.cssText = 'display:flex;flex-direction:column;overflow:hidden;border-radius:8px;border:1px solid hsl(var(--border));background:hsl(var(--card));';
+      var tmContent = tmPanel.querySelector('.ta-tm-glossary-content');
+      if (tmContent) tmContent.style.cssText = 'flex:1 1 0%;min-height:0;overflow-y:auto;';
+      row.appendChild(tmPanel);
+    }
+
+    // Move Principles panel if not already in the row
+    if (prPanel && prPanel.parentElement !== row) {
+      prPanel.style.cssText = 'display:flex;flex-direction:column;overflow:hidden;border-radius:8px;border:1px solid hsl(var(--border));background:hsl(var(--card));';
+      var prContent = prPanel.querySelector('.px-3.pb-3');
+      if (prContent) prContent.style.cssText = 'flex:1 1 0%;min-height:0;overflow-y:auto;';
+      row.appendChild(prPanel);
+    }
+
+    // If only one panel exists, let it span full width
+    if (row.children.length === 1) {
+      row.style.gridTemplateColumns = '1fr';
+    } else {
+      row.style.gridTemplateColumns = '1fr 1fr';
+    }
+
+    // Hide the row if no panels
+    row.style.display = row.children.length > 0 ? 'grid' : 'none';
   }
+
   var raf = false;
   var obs = new MutationObserver(function() {
     if (raf) return; raf = true;
-    requestAnimationFrame(function() { raf = false; fixPanels(); });
+    requestAnimationFrame(function() { raf = false; relocatePanels(); });
   });
   function go() {
     var r = document.getElementById('root');

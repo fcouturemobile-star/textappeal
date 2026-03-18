@@ -648,26 +648,3 @@ body:has(#ta-user-bar[style*="flex"]) #root {
 .min-h-\[200px\]{min-height:200px}
 .overflow-hidden{overflow:hidden}
 
-/* === Text Appeal: TM/Glossary + Principles panels fixed at 350px === */
-div:has(> [data-testid="button-toggle-details"]),
-div:has(> [data-testid="button-toggle-principles"]) {
-  flex: 0 0 350px !important;
-  height: 350px !important;
-  max-height: 350px !important;
-  min-height: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  overflow: hidden !important;
-}
-.ta-tm-glossary-content {
-  flex: 1 1 0% !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
-div:has(> [data-testid="button-toggle-principles"]) > .px-3.pb-3 {
-  flex: 1 1 0% !important;
-  min-height: 0 !important;
-  max-height: none !important;
-  overflow-y: auto !important;
-}
