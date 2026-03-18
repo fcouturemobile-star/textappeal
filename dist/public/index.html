@@ -35,6 +35,31 @@
       [class*="grid-cols-3"] > .flex.flex-col {
         min-height: 0 !important;
       }
+
+      /* ── ANTI-CLIP FIX ──
+         React keeps re-creating TM/Glossary and Principles panels inside
+         grid columns 2 & 3.  Even though JS moves copies to the bottom row,
+         the originals steal ~200-300px from the result panes.
+         This CSS collapses every .border-t wrapper inside the 3-col grid
+         so it can never take space, regardless of JS timing. */
+      [class*="grid-cols-3"] > .flex.flex-col > .border-t {
+        display: none !important;
+        height: 0 !important;
+        overflow: hidden !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        border: none !important;
+      }
+      /* Also collapse the button bar wrapper left behind in column 1 */
+      [class*="grid-cols-3"] > .flex.flex-col > .px-3.py-2.border-t {
+        display: none !important;
+      }
+      /* Force scrollable content divs to fill all available space */
+      [class*="grid-cols-3"] > .flex.flex-col > .flex-1.overflow-auto {
+        flex: 1 1 0% !important;
+        min-height: 0 !important;
+        max-height: none !important;
+      }
       /* Force visible scrollbars in all scrollable content panes */
       .overflow-auto.custom-scroll {
         overflow-y: auto !important;
