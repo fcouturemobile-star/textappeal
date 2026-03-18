@@ -1294,30 +1294,42 @@ if (document.readyState === "loading") {
     return pane;
   }
 
+  var BOTTOM_H = 200; // px for bottom row
+  var BOTTOM_GAP = 8;  // margin-top
+
+  function sizeGrid(grid, row) {
+    var parent = grid.parentElement;
+    if (!parent) return;
+    var avail = parent.clientHeight;
+    if (avail <= 0) return;
+    var used = BOTTOM_H + BOTTOM_GAP;
+    var gh = avail - used;
+    if (gh < 200) gh = 200; // safety floor
+    grid.style.setProperty('height', gh + 'px', 'important');
+    grid.style.overflow = 'hidden';
+  }
+
   function relocatePanels() {
     var grid = document.querySelector('.grid.lg\\:grid-cols-3') || document.querySelector('[class*="lg:grid-cols-3"]');
     if (!grid) return;
 
-    // Make parent a flex-column so grid + bottom row stack
     var parent = grid.parentElement;
-    if (parent) {
-      parent.style.display = 'flex';
-      parent.style.flexDirection = 'column';
-      grid.style.flex = '1 1 0%';
-      grid.style.minHeight = '0';
-      grid.style.setProperty('height', 'auto', 'important');
-    }
 
     // Find or create the bottom row
     var row = document.getElementById(ROW_ID);
     if (!row) {
       row = document.createElement('div');
       row.id = ROW_ID;
-      row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;height:200px;min-height:200px;max-height:200px;margin-top:6px;flex-shrink:0;';
-      parent.insertBefore(row, grid.nextSibling);
+      row.style.cssText = 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;height:' + BOTTOM_H + 'px;min-height:' + BOTTOM_H + 'px;max-height:' + BOTTOM_H + 'px;margin-top:' + BOTTOM_GAP + 'px;flex-shrink:0;';
+      // Insert AFTER the grid
+      if (grid.nextSibling) parent.insertBefore(row, grid.nextSibling);
+      else parent.appendChild(row);
       // Create the left pane (button + contact)
       row.appendChild(buildLeftPane());
     }
+
+    // Explicitly size the grid in pixels
+    sizeGrid(grid, row);
 
     // Move the Translate/Retranslate button into the left pane
     var btnBar = document.querySelector('[data-testid="button-translate"]');
@@ -1369,6 +1381,13 @@ if (document.readyState === "loading") {
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', go);
   else go();
+
+  // Re-size on window resize
+  window.addEventListener('resize', function() {
+    var grid = document.querySelector('.grid.lg\\:grid-cols-3') || document.querySelector('[class*="lg:grid-cols-3"]');
+    var row = document.getElementById(ROW_ID);
+    if (grid && row) sizeGrid(grid, row);
+  });
 })();
 </script>
 
