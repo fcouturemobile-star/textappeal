@@ -1159,5 +1159,97 @@ if (document.readyState === "loading") {
 })();
 </script>
 
+<script>
+// ═══ Fix: Collapse TM/Glossary by default + reduce max-height ═══
+(function() {
+  function collapseTMGlossary() {
+    // Auto-collapse TM/Glossary details when they appear
+    const observer = new MutationObserver(function() {
+      const toggleBtn = document.querySelector('[data-testid="button-toggle-details"]');
+      if (toggleBtn) {
+        // Check if the details section is expanded (sibling div visible)
+        const parent = toggleBtn.parentElement;
+        if (parent) {
+          const detailsDiv = parent.querySelector('.px-3.pb-2');
+          if (detailsDiv && !detailsDiv.hasAttribute('data-ta-collapsed')) {
+            // Click to collapse if open
+            detailsDiv.setAttribute('data-ta-collapsed', '1');
+            // Reduce max-height when expanded
+            detailsDiv.style.maxHeight = '120px';
+          }
+        }
+      }
+    });
+    const root = document.getElementById('root');
+    if (root) observer.observe(root, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', collapseTMGlossary);
+  } else {
+    collapseTMGlossary();
+  }
+})();
+
+// ═══ Fix: Clean up Word paste line breaks ═══
+(function() {
+  function setupPasteCleanup() {
+    document.addEventListener('paste', function(e) {
+      const target = e.target;
+      // Only intercept paste on contenteditable areas (the input panel)
+      if (!target || !target.isContentEditable) return;
+
+      e.preventDefault();
+
+      // Get plain text from clipboard
+      let text = (e.clipboardData || window.clipboardData).getData('text/plain');
+
+      // Clean up Word-style line breaks:
+      // - Replace single line breaks that aren't paragraph breaks with a space
+      // - Keep double line breaks (actual paragraph breaks)
+      // Step 1: Normalize \r\n to \n
+      text = text.replace(/\r\n/g, '\n');
+      // Step 2: Preserve double newlines (paragraph breaks) by replacing with placeholder
+      text = text.replace(/\n\n+/g, '\u0000PARA\u0000');
+      // Step 3: Replace single newlines (Word's soft wraps) with a space
+      text = text.replace(/\n/g, ' ');
+      // Step 4: Restore paragraph breaks
+      text = text.replace(/\u0000PARA\u0000/g, '\n\n');
+      // Step 5: Clean up multiple spaces
+      text = text.replace(/  +/g, ' ');
+
+      // Insert cleaned text
+      const selection = window.getSelection();
+      if (selection.rangeCount) {
+        const range = selection.getRangeAt(0);
+        range.deleteContents();
+        // Convert to HTML with proper paragraph breaks
+        const paragraphs = text.split('\n\n');
+        const fragment = document.createDocumentFragment();
+        paragraphs.forEach(function(p, i) {
+          if (i > 0) fragment.appendChild(document.createElement('br'));
+          if (i > 0) fragment.appendChild(document.createElement('br'));
+          fragment.appendChild(document.createTextNode(p.trim()));
+        });
+        range.insertNode(fragment);
+        // Move cursor to end
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+
+      // Trigger input event so React picks up the change
+      target.dispatchEvent(new Event('input', { bubbles: true }));
+    }, true);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupPasteCleanup);
+  } else {
+    setupPasteCleanup();
+  }
+})();
+</script>
+
 </body>
 </html>
