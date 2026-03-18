@@ -1259,23 +1259,25 @@ if (document.readyState === "loading") {
 })();
 </script>
 
-<!-- ═══ CSS-only fix: TM/Glossary + Principles at 30% height ═══ -->
+<!-- ═══ Fix: TM/Glossary + Principles -- fixed 350px, always visible ═══ -->
 <style>
   /*
-   * Target ONLY the TM/Glossary and Principles bottom panels.
-   * These have exactly class="border-t border-border" (no flex-wrap).
-   * The input column's button bar has flex-wrap, so :not(.flex-wrap) excludes it.
+   * Bottom panels: fixed 350px height, never collapse.
+   * Targets only TM/Glossary and Principles containers
+   * (the input column button bar has .flex-wrap, so :not(.flex-wrap) skips it).
    */
   .bg-card > .border-t.border-border:not(.flex-wrap) {
-    flex: 3 1 0% !important;
+    flex: 0 0 350px !important;
+    height: 350px !important;
+    max-height: 350px !important;
     min-height: 0 !important;
     display: flex !important;
     flex-direction: column !important;
     overflow: hidden !important;
   }
-  /* Result areas: 70% when paired with bottom panel */
+  /* Result areas fill the remaining space above the 350px panel */
   .bg-card > .flex-1.overflow-auto {
-    flex: 7 1 0% !important;
+    flex: 1 1 0% !important;
     min-height: 0 !important;
   }
   /* TM/Glossary scrollable content */
