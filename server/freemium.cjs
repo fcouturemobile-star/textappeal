@@ -536,6 +536,109 @@ function registerFreemiumRoutes(app) {
     });
   });
 
+  // ── Forgot Password (generates reset token, stores in DB) ──
+  app.post('/api/user/forgot-password', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    try {
+      const [users] = await db.query('SELECT id, email FROM users WHERE email = ? AND is_active = 1', [email.toLowerCase().trim()]);
+      // Always return success (don't reveal if email exists)
+      if (users.length === 0) {
+        return res.json({ ok: true, message: 'If that email exists, a reset link has been sent.' });
+      }
+
+      // Generate reset token
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + 3600000; // 1 hour
+
+      // Ensure password_resets table exists
+      await db.query(`CREATE TABLE IF NOT EXISTS password_resets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token VARCHAR(128) NOT NULL UNIQUE,
+        expires_at BIGINT NOT NULL,
+        used TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+      await db.query('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)', [users[0].id, resetToken, expiresAt]);
+
+      // Log the reset link (admin can see it in server logs; email sending can be added later)
+      const baseUrl = req.headers.origin || `${req.protocol}://${req.headers.host}`;
+      const resetLink = `${baseUrl}/#/reset-password?token=${resetToken}`;
+      console.log(`[Password Reset] User: ${users[0].email}, Link: ${resetLink}`);
+
+      res.json({ ok: true, message: 'If that email exists, a reset link has been sent.' });
+    } catch (e) {
+      console.error('Forgot password error:', e.message);
+      res.json({ ok: true, message: 'If that email exists, a reset link has been sent.' });
+    }
+  });
+
+  // ── Reset Password (with token) ──
+  app.post('/api/user/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    if (!token || !newPassword) return res.status(400).json({ error: 'Token and new password required' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    try {
+      const [resets] = await db.query('SELECT user_id FROM password_resets WHERE token = ? AND expires_at > ? AND used = 0', [token, Date.now()]);
+      if (resets.length === 0) return res.status(400).json({ error: 'Invalid or expired reset token' });
+
+      const hash = hashPassword(newPassword);
+      await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, resets[0].user_id]);
+      await db.query('UPDATE password_resets SET used = 1 WHERE token = ?', [token]);
+      // Invalidate existing sessions
+      await db.query('DELETE FROM user_sessions WHERE user_id = ?', [resets[0].user_id]);
+
+      res.json({ ok: true, message: 'Password has been reset. Please log in with your new password.' });
+    } catch (e) {
+      console.error('Reset password error:', e.message);
+      res.status(500).json({ error: 'Failed to reset password' });
+    }
+  });
+
+  // ── Cancel Subscription ──
+  app.post('/api/user/cancel-subscription', userAuth, async (req, res) => {
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    try {
+      const user = req.user;
+      const [userRows] = await db.query('SELECT stripe_subscription_id, stripe_customer_id FROM users WHERE id = ?', [user.user_id]);
+
+      if (!userRows[0]?.stripe_subscription_id) {
+        return res.status(400).json({ error: 'No active subscription found' });
+      }
+
+      const cfg = await getStripeConfig();
+      if (!cfg.secret_key) {
+        return res.status(503).json({ error: 'Stripe not configured' });
+      }
+
+      const stripe = require('stripe')(cfg.secret_key);
+
+      // Cancel at period end (user keeps access until billing period ends)
+      await stripe.subscriptions.update(userRows[0].stripe_subscription_id, {
+        cancel_at_period_end: true
+      });
+
+      await db.query('UPDATE users SET subscription_status = ? WHERE id = ?', ['canceled', user.user_id]);
+
+      res.json({ ok: true, message: 'Subscription canceled. You keep Pro access until the end of your billing period.' });
+    } catch (e) {
+      console.error('Cancel subscription error:', e.message);
+      res.status(500).json({ error: 'Failed to cancel subscription: ' + e.message });
+    }
+  });
+
   // ═══ Admin: Member Management ═════════════════════════════════════
 
   // Admin auth middleware reuse — we check x-admin-token same as existing code

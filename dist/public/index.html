@@ -173,8 +173,10 @@ function __updateReactText() {
     "Collez le texte anglais ici": "Collez le texte anglais ici",
     "First French Version": "Première version française",
     "Première version française": "Première version française",
-    "Text Appeal Version": "Version Text Appeal",
-    "Version Text Appeal": "Version Text Appeal",
+    "Text Appeal Version": "Version plus fluide",
+    "Version Text Appeal": "Version plus fluide",
+    "Version plus fluide": "Version plus fluide",
+    "More fluid Version": "Version plus fluide",
     "Translation Memory": "Mémoire de traduction",
     "Mémoire de traduction": "Mémoire de traduction",
     "Glossary": "Glossaire",
@@ -185,8 +187,10 @@ function __updateReactText() {
     "Paste English Here": "Paste English Here",
     "Première version française": "First French Version",
     "First French Version": "First French Version",
-    "Version Text Appeal": "Text Appeal Version",
-    "Text Appeal Version": "Text Appeal Version",
+    "Version Text Appeal": "More fluid Version",
+    "Text Appeal Version": "More fluid Version",
+    "Version plus fluide": "More fluid Version",
+    "More fluid Version": "More fluid Version",
     "Mémoire de traduction": "Translation Memory",
     "Translation Memory": "Translation Memory",
     "Glossaire": "Glossary",
@@ -452,6 +456,9 @@ function renderUserBar() {
       (currentUser.plan === "free" && currentUser.subscriptionStatus !== "active"
         ? '<button class="ta-btn ta-btn-upgrade" onclick="window.__taFreemium.doSubscribe()">' + __t("upgradeTo") + ' - $' + freemiumConfig.monthlyPriceCad + ' ' + __t("cadMo") + '</button>'
         : '') +
+      (currentUser.plan === "pro" && currentUser.subscriptionStatus === "active"
+        ? '<button class="ta-btn ta-btn-cancel" onclick="window.__taFreemium.doCancelSubscription()" style="font-size:11px;padding:3px 8px;background:transparent;color:#64748b;border:1px solid #64748b">' + (window.__taLang === "fr" ? "Annuler l\u2019abonnement" : "Cancel subscription") + '</button>'
+        : '') +
       '<button class="ta-btn ta-btn-logout" onclick="window.__taFreemium.doLogout()">' + __t("logout") + '</button>' +
       '</div>';
     bar.style.display = "flex";
@@ -542,7 +549,8 @@ function showAuthModal(mode) {
     '<div class="ta-modal-switch">' +
     (isRegister
       ? __t('alreadyHaveAccount') + ' <a href="#" onclick="window.__taFreemium.showAuthModal(\'login\');return false;">' + __t('logInLink') + '</a>'
-      : __t('noAccount') + ' <a href="#" onclick="window.__taFreemium.showAuthModal(\'register\');return false;">' + __t('createOneFree') + '</a>') +
+      : __t('noAccount') + ' <a href="#" onclick="window.__taFreemium.showAuthModal(\'register\');return false;">' + __t('createOneFree') + '</a>' +
+        '<br><a href="#" onclick="window.__taFreemium.showLostPasswordModal();return false;" style="font-size:13px;color:#64748b">' + (window.__taLang === "fr" ? "Mot de passe oubli\u00e9?" : "Forgot password?") + '</a>') +
     '</div>' +
     (isRegister ? '<div class="ta-modal-upgrade-hint">' + __t('wantUnlimited') + ' <a href="#" onclick="window.__taFreemium.showAuthModal(\'register\');return false;">' + __t('subscribeToPro') + ' $' + freemiumConfig.monthlyPriceCad + ' ' + __t('cadMo') + '</a> ' + __t('subscribeAfter') + '</div>' : '') +
     '</div>';
@@ -923,48 +931,191 @@ function renderLangToggle() {
     '<button class="ta-lang-btn' + (lang==="fr"?" ta-lang-active":"") + '" onclick="__setLang(\'fr\')">FR</button>';
 }
 
-// ═══ Creativity Slider ═══
+// ═══ Creativity Slider (admin-only, hidden from user) ═══
 function renderCreativitySlider() {
-  // Only show on main page (not admin)
-  if (window.location.hash.includes("/admin")) {
-    const existing = document.getElementById("ta-creativity-slider");
-    if (existing) existing.remove();
-    return;
-  }
-
-  let slider = document.getElementById("ta-creativity-slider");
-  if (!slider) {
-    slider = document.createElement("div");
-    slider.id = "ta-creativity-slider";
-    document.body.appendChild(slider);
-  }
-
-  const val = window.__taCreativity ?? 0.3;
-  const labelKey = val < 0.25 ? "direct" : val > 0.75 ? "creative" : "fluid";
-  const labelColor = val < 0.25 ? "#3b82f6" : val > 0.75 ? "#f59e0b" : "#10b981";
-
-  slider.innerHTML = '<div class="ta-creativity-inner">' +
-    '<label class="ta-creativity-label">' + __t("creativity") + ': <span style="color:' + labelColor + ';font-weight:600">' + __t(labelKey) + '</span></label>' +
-    '<div class="ta-creativity-track">' +
-    '<input type="range" min="0" max="1" step="0.05" value="' + val + '" class="ta-creativity-range" oninput="window.__taFreemium.setCreativity(parseFloat(this.value))">' +
-    '<div class="ta-creativity-labels">' +
-    '<span>' + __t("direct") + '</span>' +
-    '<span>' + __t("fluid") + '</span>' +
-    '<span>' + __t("creative") + '</span>' +
-    '</div></div></div>';
+  // Remove user-side slider entirely - creativity is admin-controlled only
+  const existing = document.getElementById("ta-creativity-slider");
+  if (existing) existing.remove();
 }
 
 function setCreativity(val) {
   window.__taCreativity = val;
   localStorage.setItem("ta_creativity", val.toString());
-  renderCreativitySlider();
 }
+
+// ═══ Lost Password Modal ═══
+function showLostPasswordModal() {
+  let modal = document.getElementById("ta-auth-modal");
+  if (modal) modal.remove();
+
+  modal = document.createElement("div");
+  modal.id = "ta-auth-modal";
+  modal.className = "ta-modal-overlay";
+  const L = window.__taLang || "en";
+
+  modal.innerHTML = '<div class="ta-modal">' +
+    '<button class="ta-modal-close" onclick="this.closest(\'.ta-modal-overlay\').remove()">&times;</button>' +
+    '<h2 class="ta-modal-title">' + (L === "fr" ? "R\u00e9initialiser le mot de passe" : "Reset Password") + '</h2>' +
+    '<p class="ta-modal-subtitle">' + (L === "fr" ? "Entrez votre courriel pour recevoir un lien de r\u00e9initialisation." : "Enter your email to receive a reset link.") + '</p>' +
+    '<form id="ta-reset-form" onsubmit="return false;">' +
+    '<div class="ta-form-group"><label>' + __t("email") + '</label><input type="email" id="ta-reset-email" placeholder="you@example.com" required autocomplete="email"></div>' +
+    '<div id="ta-reset-msg" class="ta-auth-error" style="display:none"></div>' +
+    '<button type="submit" class="ta-btn ta-btn-primary ta-btn-full" id="ta-reset-submit">' + (L === "fr" ? "Envoyer le lien" : "Send Reset Link") + '</button>' +
+    '</form>' +
+    '<div class="ta-modal-switch">' +
+    '<a href="#" onclick="window.__taFreemium.showAuthModal(\'login\');return false;">' + (L === "fr" ? "Retour \u00e0 la connexion" : "Back to login") + '</a>' +
+    '</div></div>';
+
+  document.body.appendChild(modal);
+  modal.querySelector("#ta-reset-email").focus();
+
+  modal.querySelector("#ta-reset-form").addEventListener("submit", async function(ev) {
+    ev.preventDefault();
+    const email = modal.querySelector("#ta-reset-email").value.trim();
+    const msgEl = modal.querySelector("#ta-reset-msg");
+    const btn = modal.querySelector("#ta-reset-submit");
+    msgEl.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = __t("pleaseWait");
+    try {
+      const r = await origFetch("/api/user/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const data = await r.json();
+      msgEl.style.display = "block";
+      if (r.ok) {
+        msgEl.style.color = "#10b981";
+        msgEl.textContent = L === "fr" ? "Si ce courriel existe, un lien de r\u00e9initialisation a \u00e9t\u00e9 envoy\u00e9." : "If that email exists, a reset link has been sent.";
+      } else {
+        msgEl.style.color = "#10b981";
+        msgEl.textContent = L === "fr" ? "Si ce courriel existe, un lien de r\u00e9initialisation a \u00e9t\u00e9 envoy\u00e9." : "If that email exists, a reset link has been sent.";
+      }
+      btn.disabled = false;
+      btn.textContent = L === "fr" ? "Envoyer le lien" : "Send Reset Link";
+    } catch(e) {
+      msgEl.textContent = e.message;
+      msgEl.style.display = "block";
+      msgEl.style.color = "#ef4444";
+      btn.disabled = false;
+      btn.textContent = L === "fr" ? "Envoyer le lien" : "Send Reset Link";
+    }
+  });
+
+  modal.addEventListener("click", function(ev) { if (ev.target === modal) modal.remove(); });
+}
+
+// ═══ Cancel Subscription ═══
+async function doCancelSubscription() {
+  const L = window.__taLang || "en";
+  const confirmMsg = L === "fr"
+    ? "\u00cates-vous s\u00fbr de vouloir annuler votre abonnement Pro? Vous conserverez l'acc\u00e8s jusqu'\u00e0 la fin de votre p\u00e9riode de facturation."
+    : "Are you sure you want to cancel your Pro subscription? You will keep access until the end of your billing period.";
+  if (!confirm(confirmMsg)) return;
+  const token = getToken();
+  if (!token) return;
+  try {
+    const r = await origFetch("/api/user/cancel-subscription", {
+      method: "POST",
+      headers: { "x-user-token": token, "Content-Type": "application/json" }
+    });
+    const data = await r.json();
+    if (r.ok) {
+      alert(L === "fr" ? "Votre abonnement a \u00e9t\u00e9 annul\u00e9. Vous conservez l'acc\u00e8s Pro jusqu'\u00e0 la fin de la p\u00e9riode." : "Your subscription has been canceled. You keep Pro access until the end of your billing period.");
+      await checkSession();
+    } else {
+      alert(data.error || (L === "fr" ? "Erreur lors de l'annulation." : "Error canceling subscription."));
+    }
+  } catch(e) {
+    alert(L === "fr" ? "Erreur: " + e.message : "Error: " + e.message);
+  }
+}
+
+// ═══ Cumulative Results + Scrollable + Footer Message ═══
+(function setupCumulativeResults() {
+  // Observe the result panels and prepend new results instead of replacing
+  let lastTranslation = "";
+  let lastRewrite = "";
+
+  function getFooterMessage() {
+    const L = window.__taLang || "en";
+    if (L === "fr") {
+      return '<div class="ta-result-footer" style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(128,128,128,0.3);font-size:12px;color:#888;line-height:1.5">' +
+        "N'h\u00e9sitez pas \u00e0 cliquer sur Traduire / Retraduire pour obtenir plus de propositions. L'IA n'est pas infaillible. Pour un travail plus rigoureux, contactez " +
+        '<a href="mailto:fcouture@traductionsvoila.com" style="color:#3b82f6;text-decoration:underline">fcouture@traductionsvoila.com</a>.' +
+        '</div>';
+    } else {
+      return '<div class="ta-result-footer" style="margin-top:12px;padding-top:10px;border-top:1px dashed rgba(128,128,128,0.3);font-size:12px;color:#888;line-height:1.5">' +
+        'Feel free to click on Translate / Retranslate for more propositions. AI is not infallible. For a more thorough job, contact ' +
+        '<a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>.' +
+        '</div>';
+    }
+  }
+
+  function makeScrollable(el) {
+    if (!el) return;
+    el.style.maxHeight = "300px";
+    el.style.overflowY = "auto";
+    el.style.scrollBehavior = "smooth";
+  }
+
+  // Monitor the two output divs
+  const observer = new MutationObserver(function() {
+    // First French Version panel
+    const transEl = document.querySelector('[data-testid="text-first-version"]');
+    if (transEl) {
+      const currentHTML = transEl.innerHTML;
+      if (currentHTML && currentHTML !== lastTranslation && !currentHTML.includes('ta-result-footer')) {
+        // This is a new result
+        const prevContent = transEl.getAttribute('data-ta-history') || '';
+        const separator = prevContent ? '<hr style="border:none;border-top:1px dashed rgba(128,128,128,0.3);margin:12px 0">' : '';
+        const newEntry = '<div class="ta-result-entry">' + currentHTML + getFooterMessage() + '</div>';
+        transEl.innerHTML = newEntry + separator + prevContent;
+        transEl.setAttribute('data-ta-history', newEntry + separator + prevContent);
+        lastTranslation = currentHTML;
+        makeScrollable(transEl.parentElement);
+      }
+    }
+
+    // More fluid Version panel (formerly Text Appeal Version)
+    const rewriteEl = document.querySelector('[data-testid="text-appeal-version"]');
+    if (rewriteEl) {
+      const currentHTML = rewriteEl.innerHTML;
+      if (currentHTML && currentHTML !== lastRewrite && !currentHTML.includes('ta-result-footer')) {
+        const prevContent = rewriteEl.getAttribute('data-ta-history') || '';
+        const separator = prevContent ? '<hr style="border:none;border-top:1px dashed rgba(128,128,128,0.3);margin:12px 0">' : '';
+        const newEntry = '<div class="ta-result-entry">' + currentHTML + getFooterMessage() + '</div>';
+        rewriteEl.innerHTML = newEntry + separator + prevContent;
+        rewriteEl.setAttribute('data-ta-history', newEntry + separator + prevContent);
+        lastRewrite = currentHTML;
+        makeScrollable(rewriteEl.parentElement);
+      }
+    }
+  });
+
+  // Start observing once DOM is ready
+  function startObserving() {
+    const root = document.getElementById("root");
+    if (root) {
+      observer.observe(root, { childList: true, subtree: true, characterData: true });
+    } else {
+      setTimeout(startObserving, 500);
+    }
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", startObserving);
+  } else {
+    startObserving();
+  }
+})();
 
 // ═══ Export for onclick handlers ═══
 window.__taFreemium = {
   showAuthModal, doLogout, doSubscribe, showMembersPanel, showStripePanel, showDatabasePanel,
   updateMemberPlan, toggleMember, deleteMember, initDb,
-  updateUI, renderLangToggle, renderCreativitySlider, setCreativity
+  updateUI, renderLangToggle, renderCreativitySlider, setCreativity,
+  showLostPasswordModal, doCancelSubscription
 };
 
 // ═══ Initialize ═══
