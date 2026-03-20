@@ -100,6 +100,23 @@
         background: hsl(var(--border));
         border-radius: 4px;
       }
+      /* ZDR privacy disclaimer */
+      .ta-zdr-notice {
+        color: hsl(var(--muted-foreground));
+        font-size: 11px;
+        line-height: 1.45;
+        padding: 10px 14px;
+        border-top: 1px solid hsl(var(--border) / 0.5);
+        margin-top: 6px;
+        opacity: 0.7;
+      }
+      .ta-zdr-notice a {
+        color: hsl(var(--muted-foreground));
+        text-decoration: underline;
+      }
+      .ta-zdr-notice a:hover {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
@@ -276,6 +293,13 @@ function __updateReactText() {
     const txt = el.textContent.trim();
     if (L === "fr" && headerMap[txt]) el.textContent = headerMap[txt];
     else if (L === "en" && headerMapEN[txt]) el.textContent = headerMapEN[txt];
+  });
+
+  // Update ZDR privacy notice language
+  document.querySelectorAll('.ta-zdr-notice').forEach(function(n) {
+    if (window.__taZdrEN && window.__taZdrFR) {
+      n.innerHTML = (L === 'fr') ? window.__taZdrFR : window.__taZdrEN;
+    }
   });
 
   // Update placeholder in the input area
@@ -1643,6 +1667,55 @@ if (document.readyState === "loading") {
   } else {
     setupPasteCleanup();
   }
+})();
+</script>
+
+<script>
+// ═══ ZDR Privacy Disclaimer in Input Panel ═══
+(function() {
+  var EN_TEXT = 'This site enforces a strict Zero Data Retention policy. None of your copy is being retained. Still, it is an online service, so please do not submit trade secrets, nominal information, medical documents or anything regarding legal litigation. For complete privacy, send your translation to Certified Translator Fran\u00e7ois COUTURE at <a href="mailto:fcouture@voilatranslations.com">fcouture@voilatranslations.com</a>. It will be processed offline, on a local system, and will receive all due professional attention.';
+  var FR_TEXT = 'Ce site applique strictement une politique de non-conservation des donn\u00e9es. Aucun de vos textes n\u2019est conserv\u00e9. Il s\u2019agit quand m\u00eame d\u2019un service en ligne. Nous vous prions donc de ne pas y soumettre de secrets commerciaux, de renseignements nominatifs, de documents m\u00e9dicaux ni de documents li\u00e9s \u00e0 un litige. Pour une confidentialit\u00e9 totale, confiez votre traduction directement \u00e0 Fran\u00e7ois COUTURE, traducteur agr\u00e9\u00e9, \u00e0 l\u2019adresse <a href="mailto:fcouture@traductionsvoila.com">fcouture@traductionsvoila.com</a>. Elle sera trait\u00e9e hors ligne, sur un syst\u00e8me local, et recevra toute l\u2019attention professionnelle voulue.';
+  // Expose for language toggle in __updateReactText
+  window.__taZdrEN = EN_TEXT;
+  window.__taZdrFR = FR_TEXT;
+
+  function injectNotice() {
+    // Find the contenteditable input panel
+    var editors = document.querySelectorAll('[contenteditable="true"].rich-text-editor');
+    if (editors.length === 0) editors = document.querySelectorAll('[contenteditable="true"]');
+    if (editors.length === 0) return false;
+
+    // Find the first editor's parent card/panel
+    var editor = editors[0];
+    var panel = editor.closest('.rounded-lg') || editor.closest('[class*="border"]') || editor.parentElement;
+    if (!panel) return false;
+
+    // Don't duplicate
+    if (panel.querySelector('.ta-zdr-notice')) return true;
+
+    var notice = document.createElement('div');
+    notice.className = 'ta-zdr-notice';
+    var lang = window.__taLang || 'en';
+    notice.innerHTML = (lang === 'fr') ? FR_TEXT : EN_TEXT;
+    panel.appendChild(notice);
+    return true;
+  }
+
+  // Observe DOM until we can inject
+  var _zdrObs = new MutationObserver(function() {
+    if (injectNotice()) {
+      // Keep observing in case React re-renders
+    }
+  });
+
+  function startZdr() {
+    injectNotice();
+    var r = document.getElementById('root');
+    if (r) _zdrObs.observe(r, { childList: true, subtree: true });
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startZdr);
+  else startZdr();
 })();
 </script>
 
