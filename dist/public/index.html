@@ -117,6 +117,47 @@
       .ta-zdr-notice a:hover {
         opacity: 1;
       }
+      /* Web terminology suggestions */
+      .ta-web-terms {
+        margin-top: 12px;
+        padding-top: 10px;
+        border-top: 1px solid hsl(var(--border) / 0.5);
+      }
+      .ta-web-terms-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: hsl(var(--muted-foreground));
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .ta-web-terms-title::before {
+        content: '\1F310';
+        font-size: 13px;
+      }
+      .ta-web-term-item {
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 3px 0;
+        color: hsl(var(--foreground) / 0.8);
+      }
+      .ta-web-term-en {
+        font-weight: 500;
+      }
+      .ta-web-term-arrow {
+        color: hsl(var(--muted-foreground));
+        margin: 0 4px;
+      }
+      .ta-web-term-fr {
+        font-style: italic;
+        color: hsl(var(--primary));
+      }
+      .ta-web-term-source {
+        font-size: 10px;
+        color: hsl(var(--muted-foreground));
+        margin-left: 6px;
+      }
     </style>
   </head>
   <body>
@@ -426,6 +467,18 @@ window.fetch = function(url, opts) {
       resp.clone().json().then(function(data) {
         if (data.token) capturedAdminToken = data.token;
       });
+    }
+    // Intercept translate response to capture web terminology suggestions
+    if (typeof url === "string" && url.includes("/api/translate") && resp.ok) {
+      resp.clone().json().then(function(data) {
+        if (data.webTermSuggestions && data.webTermSuggestions.length > 0) {
+          window.__taWebTerms = data.webTermSuggestions;
+          setTimeout(renderWebTermSuggestions, 500);
+        } else {
+          window.__taWebTerms = [];
+          setTimeout(renderWebTermSuggestions, 500);
+        }
+      }).catch(function() {});
     }
     // Intercept 402 (limit reached) responses
     if (resp.status === 402) {
@@ -1549,6 +1602,13 @@ if (document.readyState === "loading") {
         }
         // Copy content from the React-owned panel
         tmMirror.innerHTML = tmPanel.innerHTML;
+        // Append web terminology suggestions if available
+        if (window.__taWebTerms && window.__taWebTerms.length > 0) {
+          var existingWebTerms = tmMirror.querySelector('.ta-web-terms');
+          if (!existingWebTerms) {
+            renderWebTermSuggestions_inPanel(tmMirror);
+          }
+        }
       }
     }
 
@@ -1668,6 +1728,68 @@ if (document.readyState === "loading") {
     setupPasteCleanup();
   }
 })();
+</script>
+
+<script>
+// ═══ Web Terminology Suggestions Renderer ═══
+function renderWebTermSuggestions_inPanel(panel) {
+  var terms = window.__taWebTerms || [];
+  var lang = window.__taLang || 'en';
+
+  if (!panel) return;
+
+  // Remove existing web terms section
+  var existing = panel.querySelector('.ta-web-terms');
+  if (existing) existing.remove();
+
+  if (terms.length === 0) return;
+
+  var container = document.createElement('div');
+  container.className = 'ta-web-terms';
+
+  var title = document.createElement('div');
+  title.className = 'ta-web-terms-title';
+  title.textContent = lang === 'fr' ? 'Suggestions terminologiques (Web)' : 'Web Terminology Suggestions';
+  container.appendChild(title);
+
+  terms.forEach(function(t) {
+    var item = document.createElement('div');
+    item.className = 'ta-web-term-item';
+
+    var en = document.createElement('span');
+    en.className = 'ta-web-term-en';
+    en.textContent = t.en;
+    item.appendChild(en);
+
+    var arrow = document.createElement('span');
+    arrow.className = 'ta-web-term-arrow';
+    arrow.textContent = '\u2192';
+    item.appendChild(arrow);
+
+    var fr = document.createElement('span');
+    fr.className = 'ta-web-term-fr';
+    fr.textContent = t.fr;
+    item.appendChild(fr);
+
+    if (t.source) {
+      var src = document.createElement('span');
+      src.className = 'ta-web-term-source';
+      src.textContent = '(' + t.source + ')';
+      item.appendChild(src);
+    }
+
+    container.appendChild(item);
+  });
+
+  panel.appendChild(container);
+}
+
+function renderWebTermSuggestions() {
+  // Find the TM mirror panel
+  var tmPanel = document.getElementById('ta-mirror-tm');
+  if (!tmPanel) return;
+  renderWebTermSuggestions_inPanel(tmPanel);
+}
 </script>
 
 <script>
