@@ -472,9 +472,14 @@ window.fetch = function(url, opts) {
       resp.clone().json().then(function(data) {
         window.__taLocalTMEnabled = data.localTMEnabled !== false;
         window.__taWebTerms = (data.webTermSuggestions && data.webTermSuggestions.length > 0) ? data.webTermSuggestions : [];
-        setTimeout(renderWebTermSuggestions, 500);
-        setTimeout(updateTMPaneVisibility, 600);
-      }).catch(function() {});
+        console.log('Web terms received:', window.__taWebTerms.length, 'localTM:', window.__taLocalTMEnabled);
+        // Render immediately and also with delays to catch React re-renders
+        renderWebTermSuggestions();
+        updateTMPaneVisibility();
+        setTimeout(function() { renderWebTermSuggestions(); updateTMPaneVisibility(); }, 300);
+        setTimeout(function() { renderWebTermSuggestions(); updateTMPaneVisibility(); }, 1000);
+        setTimeout(function() { renderWebTermSuggestions(); updateTMPaneVisibility(); }, 2000);
+      }).catch(function(e) { console.warn('Web terms intercept error:', e); });
     }
     // Intercept 402 (limit reached) responses
     if (resp.status === 402) {
@@ -1664,16 +1669,10 @@ if (document.readyState === "loading") {
           }
         }
         // Render web terminology in its own sub-pane
-        if (tmWebPane) {
-          if (window.__taWebTerms && window.__taWebTerms.length > 0) {
-            tmWebPane.style.display = '';
-            // When TM is off, web terms pane fills the full space
-            tmWebPane.style.flex = _tmEnabled ? '1' : '1';
-            renderWebTermSuggestions_inPanel(tmWebPane);
-          } else {
-            tmWebPane.style.display = 'none';
-            tmWebPane.innerHTML = '';
-          }
+        // Note: do NOT hide the web pane here -- let renderWebTermSuggestions control it
+        if (tmWebPane && window.__taWebTerms && window.__taWebTerms.length > 0) {
+          tmWebPane.style.display = '';
+          renderWebTermSuggestions_inPanel(tmWebPane);
         }
       }
     }
