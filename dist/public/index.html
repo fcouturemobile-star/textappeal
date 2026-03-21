@@ -429,7 +429,7 @@ function __updateReactText() {
 
   // Update section headers (direction-aware)
   var _d = window.__taDirection || 'en-fr';
-  var _inputLabel = L === 'fr' ? (_d === 'en-fr' ? 'Collez le texte anglais ici' : 'Collez le texte fran\u00e7ais ici') : (_d === 'en-fr' ? 'Paste English Here' : 'Paste French Here');
+  var _inputLabel = L === 'fr' ? (_d === 'en-fr' ? 'Collez le texte anglais ici (un seul paragraphe de pr\u00e9f\u00e9rence)' : 'Collez le texte fran\u00e7ais ici (un seul paragraphe de pr\u00e9f\u00e9rence)') : (_d === 'en-fr' ? 'Paste English Here (ideally a single paragraph)' : 'Paste French Here (ideally a single paragraph)');
   var _col2Label = L === 'fr' ? (_d === 'en-fr' ? 'Premi\u00e8re version fran\u00e7aise' : 'First English Version') : (_d === 'en-fr' ? 'First French Version' : 'First English Version');
   var _col3Label = L === 'fr' ? 'Version plus fluide' : 'More fluid Version';
   const headerMap = {
@@ -2315,7 +2315,38 @@ if (document.readyState === "loading") {
           prMirror.style.cssText = CARD + 'overflow-y:auto;';
           row.appendChild(prMirror);
         }
-        prMirror.innerHTML = prPanel.innerHTML;
+        // Build principles from API data (mirroring React HTML loses event handlers and hidden content)
+        var _prData = window.__taPrinciplesData;
+        if (_prData && _prData.length > 0) {
+          var _prHtml = '<div style="padding:4px 0">';
+          _prData.forEach(function(p, i) {
+            var hasExp = p.explanation && p.explanation.trim();
+            _prHtml += '<div style="cursor:pointer;display:flex;align-items:flex-start;gap:6px;padding:5px 8px;border-radius:6px" class="ta-pr-item" data-idx="' + i + '">' +
+              '<span style="font-size:10px;padding:1px 5px;border-radius:4px;background:rgba(217,181,60,0.12);color:#b88f0a;border:1px solid rgba(217,181,60,0.25);white-space:nowrap;margin-top:1px">#' + p.id + '</span>' +
+              '<span style="font-size:12px;font-weight:500;flex:1">' + p.name + '</span>' +
+              (hasExp ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-top:3px;flex-shrink:0;transition:transform 0.2s;color:#888" class="ta-pr-chev"><path d="m6 9 6 6 6-6"/></svg>' : '') +
+              '</div>' +
+              (hasExp ? '<div class="ta-pr-exp" style="display:none;margin:0 8px 6px 36px;font-size:11px;color:#666;line-height:1.5;background:rgba(0,0,0,0.03);border-radius:6px;padding:6px 10px">' + p.explanation + '</div>' : '');
+          });
+          _prHtml += '</div>';
+          prMirror.innerHTML = '<div style="font-size:13px;font-weight:600;padding:0 8px 6px">' +
+            (window.__taLang === 'fr' ? 'Principes' : 'Principles') +
+            ' <span style="font-size:11px;font-weight:400;color:#888">(' + _prData.length + ')</span></div>' + _prHtml;
+          // Attach expand/collapse handlers
+          prMirror.querySelectorAll('.ta-pr-item').forEach(function(item) {
+            item.addEventListener('click', function() {
+              var exp = item.nextElementSibling;
+              if (exp && exp.classList.contains('ta-pr-exp')) {
+                var show = exp.style.display === 'none';
+                exp.style.display = show ? '' : 'none';
+                var chev = item.querySelector('.ta-pr-chev');
+                if (chev) chev.style.transform = show ? 'rotate(180deg)' : '';
+              }
+            });
+          });
+        } else {
+          prMirror.innerHTML = prPanel.innerHTML;
+        }
       }
     }
 
