@@ -576,9 +576,9 @@ window.fetch = function(url, opts) {
     }
   }
   // Inject direction and style into principles fetch
-  if (typeof url === "string" && url.includes("/api/principles") && !url.includes("direction=")) {
-    var _sep = url.includes('?') ? '&' : '?';
-    url = url + _sep + 'direction=' + (window.__taDirection || 'en-fr') + '&style=' + (window.__taStyle || 'textAppeal');
+  if (typeof url === "string" && url.includes("/api/principles")) {
+    // Always override with current direction and style
+    url = '/api/principles?direction=' + (window.__taDirection || 'en-fr') + '&style=' + (window.__taStyle || 'textAppeal');
   }
   // Inject direction into translate requests and capture translation result
   if (typeof url === "string" && url.includes("/api/translate") && opts.body) {
