@@ -27,6 +27,7 @@
     <script type="module" crossorigin src="./assets/index-CHn3W7iT.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-BmT-Nf-e.css">
     <style>
+      /* Hide the React LLM config temperature slider — replaced by dual sliders in overlay */
       /* Safari flexbox fix: explicit min-height:0 on every flex child in the scroll chain.
          Safari's implied min-height:auto prevents flex children from shrinking
          below content size, causing overflow:auto to never activate. */
@@ -1091,6 +1092,17 @@ function injectAdminSections() {
         '</div>';
 
       container.appendChild(sections);
+
+      // Hide the React temperature slider (replaced by our dual sliders)
+      setTimeout(function() {
+        var reactSlider = document.querySelector('input[data-testid="slider"]');
+        if (reactSlider) {
+          // Walk up to the parent .space-y-2 div that contains label + value + slider
+          var parent = reactSlider.closest('.space-y-2');
+          if (parent) parent.style.display = 'none';
+          else reactSlider.parentElement.style.display = 'none';
+        }
+      }, 500);
 
       // Wire up local TM toggle
       (async function() {
