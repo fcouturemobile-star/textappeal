@@ -1592,17 +1592,17 @@ var _splashFile = require("path").join(
 );
 var _splashDefaults = {
   en: {
-    title: "Welcome to TextAppeal Pro!",
+    title: "Welcome to TextAppeal\u2122 Pro!",
     p1: "This AI tool operates online. Please avoid entering sensitive information.",
     p2: "No translation engine achieves perfection on every attempt. You may need to run your text through more than once to reach a satisfying result.",
-    p3: 'TextAppeal Pro complements, but never replaces, a flesh-and-blood Certified Translator. For longer or confidential documents, contact Certified Translator and Copywriter Fran\u00e7ois Couture at <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. A qualified professional will process your document offline with full oversight. A guarantee of quality and discretion.',
+    p3: 'TextAppeal\u2122 Pro complements, but never replaces, a flesh-and-blood Certified Translator. For longer or confidential documents, contact Certified Translator and Copywriter Fran\u00e7ois Couture at <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. A qualified professional will process your document offline with full oversight. A guarantee of quality and discretion.',
     btn: "I understand"
   },
   fr: {
-    title: "Bienvenue dans TextAppeal Pro\u00a0!",
+    title: "Bienvenue dans TextAppeal\u2122 Pro\u00a0!",
     p1: "Cet outil d\u2019IA fonctionne en ligne. \u00c9vitez d\u2019y saisir des renseignements sensibles.",
     p2: "Aucun moteur de traduction n\u2019atteint la perfection du premier coup. Vous devrez peut-\u00eatre soumettre votre texte plus d\u2019une fois pour obtenir un r\u00e9sultat satisfaisant.",
-    p3: 'TextAppeal Pro compl\u00e8te le travail d\u2019un traducteur agr\u00e9\u00e9 en chair et en os, sans jamais le remplacer. Confiez vos documents longs ou confidentiels au traducteur agr\u00e9\u00e9 et r\u00e9dacteur agr\u00e9\u00e9 Fran\u00e7ois Couture, \u00e0 l\u2019adresse <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. Un professionnel qualifi\u00e9 traitera votre document hors ligne, en toute rigueur. Une garantie de qualit\u00e9 et de discr\u00e9tion.',
+    p3: 'TextAppeal\u2122 Pro compl\u00e8te le travail d\u2019un traducteur agr\u00e9\u00e9 en chair et en os, sans jamais le remplacer. Confiez vos documents longs ou confidentiels au traducteur agr\u00e9\u00e9 et r\u00e9dacteur agr\u00e9\u00e9 Fran\u00e7ois Couture, \u00e0 l\u2019adresse <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. Un professionnel qualifi\u00e9 traitera votre document hors ligne, en toute rigueur. Une garantie de qualit\u00e9 et de discr\u00e9tion.',
     btn: "Je comprends"
   }
 };

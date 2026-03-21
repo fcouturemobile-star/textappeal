@@ -19,7 +19,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <title>Text Appeal - EN→FR-CA Translator</title>
+    <title>Text Appeal™ - EN→FR-CA Translator</title>
     <meta name="description" content="Professional English to Canadian French translator with TM, glossary, and 25 Text Appeal style principles by François COUTURE." />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -291,6 +291,7 @@ window.__i18n = {
   en: {
     createFreeAccount: "Create Free Account",
     getCustomSite: "Get Your Own Custom Site",
+    buyBook: "Buy the Text Appeal\u2122 book",
     logIn: "Log In",
     logout: "Logout",
     upgradeTo: "Upgrade to Pro",
@@ -309,7 +310,7 @@ window.__i18n = {
     upgradeNow: "Upgrade Now",
     orWait: "Or wait until next month for your free requests to reset.",
     createAccount: "Create Account",
-    welcomeBack: "Welcome back to Text Appeal.",
+    welcomeBack: "Welcome back to Text Appeal\u2122.",
     freeRequestsPerMonth: "free requests per month. Upgrade anytime.",
     name: "Name",
     yourName: "Your name (optional)",
@@ -337,6 +338,7 @@ window.__i18n = {
   fr: {
     createFreeAccount: "Créer un compte gratuit",
     getCustomSite: "Procurez-vous un site personnalis\u00e9",
+    buyBook: "Achetez le livre Text Appeal\u2122",
     logIn: "Connexion",
     logout: "Déconnexion",
     upgradeTo: "Passer à Pro",
@@ -355,7 +357,7 @@ window.__i18n = {
     upgradeNow: "Passer à Pro maintenant",
     orWait: "Ou attendez le mois prochain pour que vos requêtes gratuites se réinitialisent.",
     createAccount: "Créer un compte",
-    welcomeBack: "Bienvenue sur Text Appeal.",
+    welcomeBack: "Bienvenue sur Text Appeal\u2122.",
     freeRequestsPerMonth: "requêtes gratuites par mois. Passez à Pro en tout temps.",
     name: "Nom",
     yourName: "Votre nom (facultatif)",
@@ -435,7 +437,9 @@ function __updateReactText() {
     "First French Version": _col2Label,
     "First English Version": _col2Label,
     "Premi\u00e8re version fran\u00e7aise": _col2Label,
+    "Text Appeal\u2122 Version": _col3Label,
     "Text Appeal Version": _col3Label,
+    "Version Text Appeal\u2122": _col3Label,
     "Version Text Appeal": _col3Label,
     "Version plus fluide": _col3Label,
     "More fluid Version": _col3Label,
@@ -452,7 +456,9 @@ function __updateReactText() {
     "Premi\u00e8re version fran\u00e7aise": _col2Label,
     "First French Version": _col2Label,
     "First English Version": _col2Label,
+    "Version Text Appeal\u2122": _col3Label,
     "Version Text Appeal": _col3Label,
+    "Text Appeal\u2122 Version": _col3Label,
     "Text Appeal Version": _col3Label,
     "Version plus fluide": _col3Label,
     "More fluid Version": _col3Label,
@@ -512,17 +518,17 @@ function __updateReactText() {
   // Fallback defaults in case API is unavailable
   const defaults = {
     en: {
-      title: "Welcome to TextAppeal Pro!",
+      title: "Welcome to TextAppeal\u2122 Pro!",
       p1: "This AI tool operates online. Please avoid entering sensitive information.",
       p2: "No translation engine achieves perfection on every attempt. You may need to run your text through more than once to reach a satisfying result.",
-      p3: 'TextAppeal Pro complements, but never replaces, a flesh-and-blood Certified Translator. For longer or confidential documents, contact Certified Translator and Copywriter Fran\u00e7ois Couture at <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. A qualified professional will process your document offline with full oversight. A guarantee of quality and discretion.',
+      p3: 'TextAppeal\u2122 Pro complements, but never replaces, a flesh-and-blood Certified Translator. For longer or confidential documents, contact Certified Translator and Copywriter Fran\u00e7ois Couture at <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. A qualified professional will process your document offline with full oversight. A guarantee of quality and discretion.',
       btn: "I understand"
     },
     fr: {
-      title: "Bienvenue dans TextAppeal Pro\u00a0!",
+      title: "Bienvenue dans TextAppeal\u2122 Pro\u00a0!",
       p1: "Cet outil d\u2019IA fonctionne en ligne. \u00c9vitez d\u2019y saisir des renseignements sensibles.",
       p2: "Aucun moteur de traduction n\u2019atteint la perfection du premier coup. Vous devrez peut-\u00eatre soumettre votre texte plus d\u2019une fois pour obtenir un r\u00e9sultat satisfaisant.",
-      p3: 'TextAppeal Pro compl\u00e8te le travail d\u2019un traducteur agr\u00e9\u00e9 en chair et en os, sans jamais le remplacer. Confiez vos documents longs ou confidentiels au traducteur agr\u00e9\u00e9 et r\u00e9dacteur agr\u00e9\u00e9 Fran\u00e7ois Couture, \u00e0 l\u2019adresse <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. Un professionnel qualifi\u00e9 traitera votre document hors ligne, en toute rigueur. Une garantie de qualit\u00e9 et de discr\u00e9tion.',
+      p3: 'TextAppeal\u2122 Pro compl\u00e8te le travail d\u2019un traducteur agr\u00e9\u00e9 en chair et en os, sans jamais le remplacer. Confiez vos documents longs ou confidentiels au traducteur agr\u00e9\u00e9 et r\u00e9dacteur agr\u00e9\u00e9 Fran\u00e7ois Couture, \u00e0 l\u2019adresse <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. Un professionnel qualifi\u00e9 traitera votre document hors ligne, en toute rigueur. Une garantie de qualit\u00e9 et de discr\u00e9tion.',
       btn: "Je comprends"
     }
   };
@@ -788,6 +794,7 @@ function renderUserBar() {
       '<button class="ta-btn ta-btn-login" onclick="window.__taFreemium.showAuthModal(\'login\')">' + __t("logIn") + '</button>' +
       '<button class="ta-btn ta-btn-register" onclick="window.__taFreemium.showAuthModal(\'register\')">' + __t("createFreeAccount") + '</button>' +
       '<a href="mailto:' + (window.__taLang === 'fr' ? 'fcouture@traductionsvoila.com' : 'fcouture@voilatranslations.com') + '" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("getCustomSite") + '</a>' +
+      '<a href="' + (window.__taLang === 'fr' ? 'https://a.co/d/07c4LrCZ' : 'https://a.co/d/0e8L3V1K') + '" target="_blank" rel="noopener" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("buyBook") + '</a>' +
       '</div>';
     bar.style.display = "flex";
   }
@@ -1019,10 +1026,10 @@ function injectAdminSections() {
         '<div id="ta-style-prompts-editor">' +
         '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
         '<select id="ta-sp-select" style="flex:1;padding:6px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
-        '<option value="fr:textAppeal">Text Appeal (FR)</option>' +
+        '<option value="fr:textAppeal">Text Appeal\u2122 (FR)</option>' +
         '<option value="fr:clearSimpleInclusive">Clair et inclusif (FR)</option>' +
         '<option value="fr:classicalFrench">Fran\u00e7ais classique (FR)</option>' +
-        '<option value="en:textAppeal">Text Appeal (EN)</option>' +
+        '<option value="en:textAppeal">Text Appeal\u2122 (EN)</option>' +
         '<option value="en:clearSimpleInclusive">Clear &amp; Inclusive (EN)</option>' +
         '<option value="en:classicalEnglish">Classical English (EN)</option>' +
         '</select>' +
@@ -1675,7 +1682,7 @@ function renderStyleToggle() {
         var _dir = window.__taDirection || 'en-fr';
         var _targetFR = (_dir === 'en-fr');
         var labelMap = {
-          textAppeal: 'Text Appeal',
+          textAppeal: 'Text Appeal\u2122',
           clearSimpleInclusive: lang==='fr' ? 'Clair et inclusif' : 'Clear & Inclusive',
           classicalFrench: _targetFR ? (lang==='fr'?'Fran\u00e7ais classique':'Classical French') : (lang==='fr'?'Anglais classique':'Classical English')
         };
@@ -1713,7 +1720,7 @@ function renderStyleToggle() {
   var _dir = window.__taDirection || 'en-fr';
   var _targetFR = (_dir === 'en-fr');
   var labels = {
-    textAppeal: 'Text Appeal',
+    textAppeal: 'Text Appeal\u2122',
     clearSimpleInclusive: lang === 'fr' ? 'Clair et inclusif' : 'Clear & Inclusive',
     classicalFrench: _targetFR ? (lang==='fr'?'Fran\u00e7ais classique':'Classical French') : (lang==='fr'?'Anglais classique':'Classical English')
   };
