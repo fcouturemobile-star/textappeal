@@ -123,55 +123,46 @@
         padding: 0 0 4px 0;
       }
       /* Style toggle */
-      #ta-style-toggle {
-        position: fixed;
-        top: 8px;
-        left: 50%;
-        transform: translateX(-50%);
-        z-index: 9999;
+      .ta-style-wrapper {
         display: flex;
         flex-direction: column;
-        align-items: center;
-        gap: 3px;
+        align-items: flex-start;
+        gap: 4px;
+        margin-bottom: 8px;
+        width: 100%;
       }
       .ta-style-caption {
-        font-size: 9px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: hsl(var(--foreground) / 0.5);
-        font-weight: 600;
+        font-size: 11px;
+        color: hsl(var(--muted-foreground));
+        font-weight: 500;
       }
       .ta-style-buttons {
         display: flex;
-        gap: 0;
-        background: hsl(var(--card));
-        border-radius: 6px;
-        padding: 2px;
-        border: 1px solid hsl(var(--border));
-        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
+        flex-direction: column;
+        gap: 3px;
+        width: 100%;
       }
       .ta-style-btn {
         font-size: 11px;
-        padding: 5px 12px;
-        border: none;
+        padding: 5px 10px;
+        border: 1px solid hsl(var(--border));
         background: transparent;
         color: hsl(var(--foreground));
         cursor: pointer;
-        border-radius: 4px;
+        border-radius: 5px;
         white-space: nowrap;
         font-weight: 500;
         transition: all 0.15s;
-        opacity: 0.7;
+        text-align: left;
+        width: 100%;
       }
       .ta-style-btn:hover {
-        opacity: 1;
         background: hsl(var(--muted) / 0.5);
       }
       .ta-style-btn.ta-style-active {
         background: hsl(var(--primary));
         color: hsl(var(--primary-foreground));
-        opacity: 1;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+        border-color: hsl(var(--primary));
       }
       .ta-web-terms-title {
         font-size: 12px;
@@ -1301,30 +1292,44 @@ function __setStyle(style) {
 }
 
 function renderStyleToggle() {
-  var toggle = document.getElementById("ta-style-toggle");
+  // Render into the left bottom pane, above the translate button
+  var leftPane = document.getElementById('ta-bottom-left');
+  var btnSlot = document.getElementById('ta-btn-slot');
+  if (!leftPane || !btnSlot) return; // bottom row not ready yet
+
+  var toggle = document.getElementById('ta-style-toggle');
   if (!toggle) {
-    toggle = document.createElement("div");
-    toggle.id = "ta-style-toggle";
-    document.body.appendChild(toggle);
+    toggle = document.createElement('div');
+    toggle.id = 'ta-style-toggle';
+    toggle.className = 'ta-style-wrapper';
+    // Insert before the button slot
+    leftPane.insertBefore(toggle, btnSlot);
   }
-  var s = window.__taStyle || "textAppeal";
-  var lang = window.__taLang || "en";
-  var caption = lang === "fr" ? "Choix de style" : "Style choice";
+  var s = window.__taStyle || 'textAppeal';
+  var lang = window.__taLang || 'en';
+  var caption = lang === 'fr' ? 'Choisissez un style' : 'Choose your style';
   var labels = {
-    textAppeal: "Text Appeal",
-    clearSimpleInclusive: lang === "fr" ? "Clair et inclusif" : "Clear & Inclusive",
-    classicalFrench: lang === "fr" ? "Fran\u00e7ais classique" : "Classical French"
+    textAppeal: 'Text Appeal',
+    clearSimpleInclusive: lang === 'fr' ? 'Clair et inclusif' : 'Clear & Inclusive',
+    classicalFrench: lang === 'fr' ? 'Fran\u00e7ais classique' : 'Classical French'
   };
-  toggle.innerHTML = '<div class="ta-style-caption">' + caption + '</div><div class="ta-style-buttons" id="ta-style-buttons"></div>';
-  var btnContainer = document.getElementById("ta-style-buttons");
-  var keys = ["textAppeal", "clearSimpleInclusive", "classicalFrench"];
+  // Clear and rebuild
+  toggle.innerHTML = '';
+  var cap = document.createElement('div');
+  cap.className = 'ta-style-caption';
+  cap.textContent = caption;
+  toggle.appendChild(cap);
+  var btnContainer = document.createElement('div');
+  btnContainer.className = 'ta-style-buttons';
+  var keys = ['textAppeal', 'clearSimpleInclusive', 'classicalFrench'];
   keys.forEach(function(key) {
-    var btn = document.createElement("button");
-    btn.className = "ta-style-btn" + (s === key ? " ta-style-active" : "");
+    var btn = document.createElement('button');
+    btn.className = 'ta-style-btn' + (s === key ? ' ta-style-active' : '');
     btn.textContent = labels[key];
-    btn.addEventListener("click", function() { __setStyle(key); });
+    btn.addEventListener('click', function() { __setStyle(key); });
     btnContainer.appendChild(btn);
   });
+  toggle.appendChild(btnContainer);
 }
 
 function updatePrinciplesBadge() {
@@ -1692,7 +1697,12 @@ if (document.readyState === "loading") {
       else parent.appendChild(row);
       // Create the left pane (button + contact)
       row.appendChild(buildLeftPane());
+      // Render style toggle into the left pane
+      renderStyleToggle();
     }
+
+    // Re-render style toggle if not present (in case left pane was rebuilt)
+    if (!document.getElementById('ta-style-toggle')) renderStyleToggle();
 
     // Explicitly size the grid in pixels
     sizeGrid(grid, row);
