@@ -2166,24 +2166,27 @@ function renderWebTermSuggestions_inPanel(panel) {
   title.textContent = lang === 'fr' ? 'Suggestions terminologiques (Web)' : 'Web Terminology Suggestions';
   container.appendChild(title);
 
+  var _dir = window.__taDirection || 'en-fr';
   terms.forEach(function(t) {
     var item = document.createElement('div');
     item.className = 'ta-web-term-item';
 
-    var en = document.createElement('span');
-    en.className = 'ta-web-term-en';
-    en.textContent = t.en;
-    item.appendChild(en);
+    // Source term (left side of arrow)
+    var srcTerm = document.createElement('span');
+    srcTerm.className = 'ta-web-term-en';
+    srcTerm.textContent = (_dir === 'fr-en') ? t.fr : t.en;
+    item.appendChild(srcTerm);
 
     var arrow = document.createElement('span');
     arrow.className = 'ta-web-term-arrow';
     arrow.textContent = '\u2192';
     item.appendChild(arrow);
 
-    var fr = document.createElement('span');
-    fr.className = 'ta-web-term-fr';
-    fr.textContent = t.fr;
-    item.appendChild(fr);
+    // Target term (right side of arrow)
+    var tgtTerm = document.createElement('span');
+    tgtTerm.className = 'ta-web-term-fr';
+    tgtTerm.textContent = (_dir === 'fr-en') ? t.en : t.fr;
+    item.appendChild(tgtTerm);
 
     if (t.source) {
       var src = document.createElement('span');
