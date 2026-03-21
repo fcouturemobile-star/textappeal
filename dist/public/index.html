@@ -2182,66 +2182,83 @@ if (document.readyState === "loading") {
   var ALL_ALLOWED = ALLOWED_BLOCK.concat(ALLOWED_INLINE);
 
   function cleanWordHtml(html) {
-    // 1. Remove HTML comments (Word inserts tons: <!--[if ...]>, <!--StartFragment-->, etc.)
+    // 1. Extract just the body content if it's a full document
+    var bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+    if (bodyMatch) html = bodyMatch[1];
+    // Also handle StartFragment/EndFragment markers from clipboard
+    var fragMatch = html.match(/<!--StartFragment-->([\s\S]*?)<!--EndFragment-->/);
+    if (fragMatch) html = fragMatch[1];
+    // 2. Remove HTML comments
     html = html.replace(/<!--[\s\S]*?-->/g, '');
-    // 2. Remove <style> and <meta> blocks
+    // 3. Remove <style>, <meta>, <link>, <title> blocks
     html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    html = html.replace(/<meta[^>]*>/gi, '');
-    html = html.replace(/<link[^>]*>/gi, '');
+    html = html.replace(/<meta[^>]*\/?>/gi, '');
+    html = html.replace(/<link[^>]*\/?>/gi, '');
     html = html.replace(/<title[^>]*>[\s\S]*?<\/title>/gi, '');
-    // 3. Remove Word-specific XML namespaced tags (o:p, w:*, v:*, etc.)
-    html = html.replace(/<\/?\w+:[^>]*>/g, '');
-    // 4. Remove class and style attributes (Word's biggest source of bloat)
-    html = html.replace(/\s+(class|style|lang|dir|align|valign|bgcolor|width|height|cellpadding|cellspacing|border)\s*=\s*"[^"]*"/gi, '');
-    html = html.replace(/\s+(class|style|lang|dir|align|valign|bgcolor|width|height|cellpadding|cellspacing|border)\s*=\s*'[^']*'/gi, '');
-    // 5. Remove data-* attributes
-    html = html.replace(/\s+data-[a-z-]+\s*=\s*"[^"]*"/gi, '');
-    // 6. Remove empty spans: <span>text</span> -> text
-    html = html.replace(/<span\s*>(.*?)<\/span>/gi, '$1');
-    // 7. Convert Word's <b> to <strong>, <i> to <em> (they're usually already correct)
-    // 8. Remove &nbsp; except between words
+    // 4. Remove Word-specific XML namespaced tags (o:p, w:*, v:*, etc.)
+    html = html.replace(/<\/?\w+:[^>]*\/?>/g, '');
+    // 5. Remove all attributes except href on <a> tags
+    // First, protect href: temporarily replace <a href="..."> with a placeholder
+    html = html.replace(/<a\s+[^>]*href\s*=\s*["']([^"']*)["'][^>]*>/gi, '<a data-keep-href="$1">');
+    // Remove all attributes from all tags
+    html = html.replace(/<(\w+)\s+[^>]*>/g, '<$1>');
+    // Restore href on <a> tags
+    html = html.replace(/<a data-keep-href="([^"]*)"/g, '<a href="$1"');
+    // 6. Remove empty spans
+    html = html.replace(/<span>(.*?)<\/span>/gi, '$1');
+    // 7. Replace &nbsp; with space
     html = html.replace(/&nbsp;/g, ' ');
-    // 9. Parse and filter through DOM for safety
-    var doc = new DOMParser().parseFromString('<div>' + html + '</div>', 'text/html');
-    var root = doc.body.firstChild || doc.body;
-    return sanitizeNode(root);
+    // 8. Clean up empty paragraphs (but keep at least a <br> for spacing)
+    html = html.replace(/<p>\s*<\/p>/gi, '');
+    // 9. Remove tags not in allowed list using DOM
+    var tempDiv = document.createElement('div');
+    tempDiv.innerHTML = html;
+    sanitizeChildren(tempDiv);
+    return tempDiv.innerHTML;
   }
 
-  function sanitizeNode(node) {
-    if (node.nodeType === 3) {
-      // Text node - keep as-is
-      return node.textContent;
-    }
-    if (node.nodeType !== 1) return '';
-    var tag = node.tagName.toLowerCase();
-    // Skip completely: script, style, head, xml tags
-    if (['script','style','head','meta','link','title'].indexOf(tag) >= 0) return '';
-    // Map some Word tags
-    if (tag === 'b') tag = 'strong';
-    if (tag === 'i') tag = 'em';
-    // Get children content
-    var inner = '';
-    for (var i = 0; i < node.childNodes.length; i++) {
-      inner += sanitizeNode(node.childNodes[i]);
-    }
-    // If it's an allowed tag, wrap content
-    if (ALL_ALLOWED.indexOf(tag) >= 0) {
-      // For links, preserve href
-      if (tag === 'a' && node.getAttribute('href')) {
-        return '<a href="' + node.getAttribute('href').replace(/"/g, '&quot;') + '">' + inner + '</a>';
+  function sanitizeChildren(parent) {
+    var KEEP_TAGS = {'p':1,'h1':1,'h2':1,'h3':1,'h4':1,'h5':1,'h6':1,'ul':1,'ol':1,'li':1,'blockquote':1,'br':1,'hr':1,'table':1,'thead':1,'tbody':1,'tr':1,'td':1,'th':1,'b':1,'strong':1,'i':1,'em':1,'u':1,'s':1,'strike':1,'sub':1,'sup':1,'a':1,'div':1};
+    // Iterate children in reverse (safe for removal)
+    var children = Array.from(parent.childNodes);
+    for (var i = 0; i < children.length; i++) {
+      var node = children[i];
+      if (node.nodeType === 3) continue; // text nodes: keep
+      if (node.nodeType !== 1) { node.remove(); continue; } // non-element: remove
+      var tag = node.tagName.toLowerCase();
+      // Skip script/style entirely
+      if (tag === 'script' || tag === 'style') { node.remove(); continue; }
+      // Rename b->strong, i->em
+      if (tag === 'b') { renameTag(node, 'strong', parent); node = parent.childNodes[i]; tag = 'strong'; }
+      if (tag === 'i') { renameTag(node, 'em', parent); node = parent.childNodes[i]; tag = 'em'; }
+      // If tag not allowed, unwrap it (keep children, remove tag)
+      if (!KEEP_TAGS[tag]) {
+        unwrapNode(node);
+      } else {
+        // Remove all attributes except href on <a>
+        if (tag === 'a') {
+          var href = node.getAttribute('href');
+          while (node.attributes.length > 0) node.removeAttribute(node.attributes[0].name);
+          if (href) node.setAttribute('href', href);
+        } else {
+          while (node.attributes.length > 0) node.removeAttribute(node.attributes[0].name);
+        }
+        // Recurse into children
+        sanitizeChildren(node);
       }
-      // Skip empty block elements
-      if (ALLOWED_BLOCK.indexOf(tag) >= 0 && !inner.trim()) {
-        return '';
-      }
-      return '<' + tag + '>' + inner + '</' + tag + '>';
     }
-    // For divs, treat as paragraphs
-    if (tag === 'div') {
-      return '<p>' + inner + '</p>';
-    }
-    // Unknown tag: just return inner content (strip the tag)
-    return inner;
+  }
+
+  function unwrapNode(node) {
+    var parent = node.parentNode;
+    while (node.firstChild) parent.insertBefore(node.firstChild, node);
+    parent.removeChild(node);
+  }
+
+  function renameTag(node, newTag, parent) {
+    var newEl = document.createElement(newTag);
+    while (node.firstChild) newEl.appendChild(node.firstChild);
+    parent.replaceChild(newEl, node);
   }
 
   function setupPasteCleanup() {
