@@ -1584,3 +1584,72 @@ function _savePersistedStyles() {
 }
 
 _loadPersistedStyles();
+
+// ═══ Persistent Splash Messages ═══
+var _splashFile = require("path").join(
+  process.env.HOME || process.env.USERPROFILE || "/tmp",
+  ".textappeal", "splash-messages.json"
+);
+var _splashDefaults = {
+  en: {
+    title: "Welcome to TextAppeal Pro!",
+    p1: "This AI tool operates online. Please avoid entering sensitive information.",
+    p2: "No translation engine achieves perfection on every attempt. You may need to run your text through more than once to reach a satisfying result.",
+    p3: 'TextAppeal Pro complements, but never replaces, a flesh-and-blood Certified Translator. For longer or confidential documents, contact Certified Translator and Copywriter Fran\u00e7ois Couture at <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. A qualified professional will process your document offline with full oversight. A guarantee of quality and discretion.',
+    btn: "I understand"
+  },
+  fr: {
+    title: "Bienvenue dans TextAppeal Pro\u00a0!",
+    p1: "Cet outil d\u2019IA fonctionne en ligne. \u00c9vitez d\u2019y saisir des renseignements sensibles.",
+    p2: "Aucun moteur de traduction n\u2019atteint la perfection du premier coup. Vous devrez peut-\u00eatre soumettre votre texte plus d\u2019une fois pour obtenir un r\u00e9sultat satisfaisant.",
+    p3: 'TextAppeal Pro compl\u00e8te le travail d\u2019un traducteur agr\u00e9\u00e9 en chair et en os, sans jamais le remplacer. Confiez vos documents longs ou confidentiels au traducteur agr\u00e9\u00e9 et r\u00e9dacteur agr\u00e9\u00e9 Fran\u00e7ois Couture, \u00e0 l\u2019adresse <a href="mailto:fcouture@voilatranslations.com" style="color:#3b82f6;text-decoration:underline">fcouture@voilatranslations.com</a>. Un professionnel qualifi\u00e9 traitera votre document hors ligne, en toute rigueur. Une garantie de qualit\u00e9 et de discr\u00e9tion.',
+    btn: "Je comprends"
+  }
+};
+var _splashMessages = JSON.parse(JSON.stringify(_splashDefaults));
+
+function _loadSplashMessages() {
+  try {
+    if (_persistFs.existsSync(_splashFile)) {
+      var data = JSON.parse(_persistFs.readFileSync(_splashFile, "utf-8"));
+      if (data.en) _splashMessages.en = data.en;
+      if (data.fr) _splashMessages.fr = data.fr;
+      console.log("Loaded persisted splash messages from disk");
+    }
+  } catch(e) { console.warn("Could not load splash messages:", e.message); }
+}
+
+function _saveSplashMessages() {
+  try {
+    _persistFs.mkdirSync(_persistPath.dirname(_splashFile), { recursive: true });
+    _persistFs.writeFileSync(_splashFile, JSON.stringify(_splashMessages, null, 2), "utf-8");
+    console.log("Splash messages saved to disk");
+  } catch(e) { console.warn("Could not save splash messages:", e.message); }
+}
+
+_loadSplashMessages();
+
+// Splash API: public GET (for splash screen) and admin GET/POST (for editing)
+ma.get("/api/splash-messages", function(req, res) {
+  res.json(_splashMessages);
+});
+ma.get("/api/admin/splash-messages", function(req, res) {
+  var token = req.headers["x-admin-token"];
+  if (!token || !lt.has(token)) return res.status(401).json({ error: "Unauthorized" });
+  res.json(_splashMessages);
+});
+ma.post("/api/admin/splash-messages", function(req, res) {
+  var token = req.headers["x-admin-token"];
+  if (!token || !lt.has(token)) return res.status(401).json({ error: "Unauthorized" });
+  var body = req.body;
+  if (!body || !body.lang) return res.status(400).json({ error: "Missing lang" });
+  var lang = body.lang;
+  if (lang !== "en" && lang !== "fr") return res.status(400).json({ error: "Invalid lang" });
+  if (body.title !== undefined) _splashMessages[lang].title = body.title;
+  if (body.p1 !== undefined) _splashMessages[lang].p1 = body.p1;
+  if (body.p2 !== undefined) _splashMessages[lang].p2 = body.p2;
+  if (body.p3 !== undefined) _splashMessages[lang].p3 = body.p3;
+  if (body.btn !== undefined) _splashMessages[lang].btn = body.btn;
+  _saveSplashMessages();
+  res.json({ ok: true, message: "Splash messages updated for " + lang });
+});

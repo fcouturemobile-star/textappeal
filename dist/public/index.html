@@ -507,7 +507,8 @@ function __updateReactText() {
 
   const lang = window.__taLang || localStorage.getItem("ta_lang") || "en";
 
-  const content = {
+  // Fallback defaults in case API is unavailable
+  const defaults = {
     en: {
       title: "Welcome to TextAppeal Pro!",
       p1: "This AI tool operates online. Please avoid entering sensitive information.",
@@ -524,11 +525,12 @@ function __updateReactText() {
     }
   };
 
-  const t = content[lang] || content.en;
-
-  const overlay = document.createElement("div");
-  overlay.id = "ta-splash";
-  overlay.innerHTML =
+  // Try to load from API, fall back to defaults
+  function showSplash(content) {
+    var t = content[lang] || content.en;
+    var overlay = document.createElement("div");
+    overlay.id = "ta-splash";
+    overlay.innerHTML =
     '<div class="ta-splash-card">' +
     '<img src="data:image/jpeg;base64,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" class="ta-splash-photo" alt="François Couture">' +
     '<h1 class="ta-splash-title">' + t.title + '</h1>' +
@@ -540,11 +542,18 @@ function __updateReactText() {
 
   document.body.appendChild(overlay);
 
-  document.getElementById("ta-splash-dismiss").addEventListener("click", function() {
-    overlay.style.opacity = "0";
-    setTimeout(function() { overlay.remove(); }, 300);
-    sessionStorage.setItem("ta_splash_seen", "1");
-  });
+    document.getElementById("ta-splash-dismiss").addEventListener("click", function() {
+      overlay.style.opacity = "0";
+      setTimeout(function() { overlay.remove(); }, 300);
+      sessionStorage.setItem("ta_splash_seen", "1");
+    });
+  }
+
+  // Fetch splash content from API, use defaults on failure
+  fetch("/api/splash-messages")
+    .then(function(r) { return r.ok ? r.json() : defaults; })
+    .then(function(data) { showSplash(data); })
+    .catch(function() { showSplash(defaults); });
 })();
 </script>
 
@@ -1020,6 +1029,36 @@ function injectAdminSections() {
         '</div>' +
         '</div>' +
         '</div>' +
+        '<div class="shadcn-card rounded-xl border bg-card border-card-border text-card-foreground shadow-sm" style="margin-top:16px;padding:24px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>' +
+        '<h3 style="font-size:18px;font-weight:600;margin:0">Splash Pages</h3></div>' +
+        '<p style="color:var(--muted-foreground,#64748b);font-size:14px;margin:0 0 16px">Edit the EN/FR splash pages shown to visitors on first load.</p>' +
+        '<div id="ta-splash-editor">' +
+        '<div style="display:flex;gap:8px;margin-bottom:10px">' +
+        '<select id="ta-splash-lang" style="padding:6px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
+        '<option value="en">EN</option>' +
+        '<option value="fr">FR</option>' +
+        '</select>' +
+        '<button class="ta-btn ta-btn-primary" id="ta-splash-load" style="font-size:12px;padding:6px 12px">Load</button>' +
+        '</div>' +
+        '<div style="display:flex;flex-direction:column;gap:8px">' +
+        '<label style="font-size:12px;font-weight:600;color:var(--foreground,#000)">Title</label>' +
+        '<input id="ta-splash-title" type="text" style="width:100%;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
+        '<label style="font-size:12px;font-weight:600;color:var(--foreground,#000)">Paragraph 1</label>' +
+        '<textarea id="ta-splash-p1" rows="2" style="width:100%;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:12px;resize:vertical;background:var(--background,#fff);color:var(--foreground,#000)"></textarea>' +
+        '<label style="font-size:12px;font-weight:600;color:var(--foreground,#000)">Paragraph 2</label>' +
+        '<textarea id="ta-splash-p2" rows="2" style="width:100%;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:12px;resize:vertical;background:var(--background,#fff);color:var(--foreground,#000)"></textarea>' +
+        '<label style="font-size:12px;font-weight:600;color:var(--foreground,#000)">Paragraph 3 (HTML allowed)</label>' +
+        '<textarea id="ta-splash-p3" rows="3" style="width:100%;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:12px;resize:vertical;background:var(--background,#fff);color:var(--foreground,#000)"></textarea>' +
+        '<label style="font-size:12px;font-weight:600;color:var(--foreground,#000)">Button text</label>' +
+        '<input id="ta-splash-btn" type="text" style="width:200px;padding:6px 8px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px">' +
+        '<button class="ta-btn ta-btn-primary" id="ta-splash-save" style="font-size:12px;padding:6px 16px">Save</button>' +
+        '<span id="ta-splash-status" style="font-size:12px;color:var(--muted-foreground,#64748b);align-self:center"></span>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
         '</div>';
 
       container.appendChild(sections);
@@ -1104,6 +1143,66 @@ function injectAdminSections() {
             }
             setTimeout(function() { spStatus.textContent = ''; spStatus.style.color = ''; }, 3000);
           } catch(e) { spStatus.textContent = 'Error saving'; }
+        });
+      })();
+
+      // Wire up splash messages editor
+      (function() {
+        var splLoad = document.getElementById('ta-splash-load');
+        var splSave = document.getElementById('ta-splash-save');
+        var splLang = document.getElementById('ta-splash-lang');
+        var splTitle = document.getElementById('ta-splash-title');
+        var splP1 = document.getElementById('ta-splash-p1');
+        var splP2 = document.getElementById('ta-splash-p2');
+        var splP3 = document.getElementById('ta-splash-p3');
+        var splBtn = document.getElementById('ta-splash-btn');
+        var splStatus = document.getElementById('ta-splash-status');
+        if (!splLoad || !splSave) return;
+
+        splLoad.addEventListener('click', async function() {
+          splStatus.textContent = 'Loading...';
+          try {
+            var at = getAdminToken();
+            var r = await origFetch('/api/admin/splash-messages', { headers: { 'x-admin-token': at } });
+            var data = await r.json();
+            var lang = splLang.value;
+            var msgs = data[lang] || {};
+            splTitle.value = msgs.title || '';
+            splP1.value = msgs.p1 || '';
+            splP2.value = msgs.p2 || '';
+            splP3.value = msgs.p3 || '';
+            splBtn.value = msgs.btn || '';
+            splStatus.textContent = 'Loaded (' + lang.toUpperCase() + ')';
+            setTimeout(function() { splStatus.textContent = ''; }, 3000);
+          } catch(e) { splStatus.textContent = 'Error loading'; }
+        });
+
+        splSave.addEventListener('click', async function() {
+          splStatus.textContent = 'Saving...';
+          try {
+            var at = getAdminToken();
+            var r = await origFetch('/api/admin/splash-messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-admin-token': at },
+              body: JSON.stringify({
+                lang: splLang.value,
+                title: splTitle.value,
+                p1: splP1.value,
+                p2: splP2.value,
+                p3: splP3.value,
+                btn: splBtn.value
+              })
+            });
+            if (r.ok) {
+              splStatus.textContent = 'Saved!';
+              splStatus.style.color = '#22c55e';
+            } else {
+              var d = await r.json();
+              splStatus.textContent = 'Error: ' + (d.error || 'unknown');
+              splStatus.style.color = '#ef4444';
+            }
+            setTimeout(function() { splStatus.textContent = ''; splStatus.style.color = ''; }, 3000);
+          } catch(e) { splStatus.textContent = 'Error saving'; }
         });
       })();
     }, 1000);
