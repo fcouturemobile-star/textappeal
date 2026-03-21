@@ -558,8 +558,8 @@ function registerFreemiumRoutes(app) {
         payment_method_types: ['card'],
         line_items: [{ price: cfg.price_id, quantity: 1 }],
         mode: 'subscription',
-        success_url: `${baseUrl}/#/subscribe/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/#/subscribe/cancel`,
+        success_url: `${baseUrl}/?subscribed=1`,
+        cancel_url: `${baseUrl}/?canceled=1`,
         metadata: { user_id: String(user.user_id) }
       });
 
