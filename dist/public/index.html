@@ -2210,18 +2210,16 @@ if (document.readyState === "loading") {
     html = html.replace(/&nbsp;/g, ' ');
     // 8. Clean up empty paragraphs
     html = html.replace(/<p>\s*<\/p>/gi, '');
-    // 9. Collapse newlines inside content to spaces (Word's visual line wraps)
-    // Preserve newlines that are between block tags (real paragraph structure)
-    html = html.replace(/>\s*\n\s*</g, '><');  // remove whitespace between tags
-    html = html.replace(/\n/g, ' ');             // collapse remaining newlines to spaces
-    html = html.replace(/  +/g, ' ');            // clean up double spaces
-    // 10. Remove tags not in allowed list using DOM
+    // 9. Remove tags not in allowed list using DOM
     var tempDiv = document.createElement('div');
     tempDiv.innerHTML = html;
     sanitizeChildren(tempDiv);
     var result = tempDiv.innerHTML;
-    // 10. Merge Word's false paragraph breaks via string processing
-    // Word creates separate <p> for each visual line.
+    // 10. Collapse ALL newlines to spaces (Word visual line wraps)
+    // Must run AFTER DOM serialization since innerHTML reintroduces newlines
+    result = result.replace(/\r\n|\r|\n/g, ' ');
+    result = result.replace(/  +/g, ' ');
+    // 11. Merge Word's false paragraph breaks
     result = mergeWordParagraphs(result);
     return result;
   }
