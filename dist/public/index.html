@@ -2366,7 +2366,19 @@ if (document.readyState === "loading") {
       var endsTerminal = /[.!?\u00BB\u201D\u201C"\)\u2019;:]/.test(lastChar);
       var startsNew = /^[A-Z\u00C0-\u00DC\u00AB\u201C\u00AB"\(\d\u2022\u2013\u2014\-\*]/.test(nextText);
 
-      if (endsTerminal && startsNew) {
+      // Check if current or next block is predominantly bold (heading-like)
+      // If so, treat as a real paragraph break regardless of punctuation
+      var curBoldText = '';
+      tmpCur.querySelectorAll('strong, b').forEach(function(el) { curBoldText += el.textContent; });
+      var nextBoldText = '';
+      tmpNext.querySelectorAll('strong, b').forEach(function(el) { nextBoldText += el.textContent; });
+      var curIsBoldBlock = curBoldText.trim().length > 0 && curBoldText.trim().length >= curText.length * 0.8;
+      var nextIsBoldBlock = nextBoldText.trim().length > 0 && nextBoldText.trim().length >= nextText.length * 0.8;
+
+      // A formatting boundary occurs when bold status changes between blocks
+      var boldBoundary = (curIsBoldBlock !== nextIsBoldBlock) && (curIsBoldBlock || nextIsBoldBlock);
+
+      if ((endsTerminal && startsNew) || boldBoundary) {
         // Real paragraph break
         merged.push(current);
         current = nextHtml;
