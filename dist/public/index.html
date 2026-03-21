@@ -130,31 +130,47 @@
         transform: translateX(-50%);
         z-index: 9999;
         display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 3px;
+      }
+      .ta-style-caption {
+        font-size: 9px;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: hsl(var(--foreground) / 0.5);
+        font-weight: 600;
+      }
+      .ta-style-buttons {
+        display: flex;
         gap: 0;
-        background: hsl(var(--muted) / 0.5);
+        background: hsl(var(--card));
         border-radius: 6px;
         padding: 2px;
         border: 1px solid hsl(var(--border));
-        backdrop-filter: blur(8px);
+        box-shadow: 0 1px 4px rgba(0,0,0,0.1);
       }
       .ta-style-btn {
         font-size: 11px;
-        padding: 4px 10px;
+        padding: 5px 12px;
         border: none;
         background: transparent;
-        color: hsl(var(--muted-foreground));
+        color: hsl(var(--foreground));
         cursor: pointer;
         border-radius: 4px;
         white-space: nowrap;
         font-weight: 500;
         transition: all 0.15s;
+        opacity: 0.7;
       }
       .ta-style-btn:hover {
-        color: hsl(var(--foreground));
+        opacity: 1;
+        background: hsl(var(--muted) / 0.5);
       }
       .ta-style-btn.ta-style-active {
         background: hsl(var(--primary));
         color: hsl(var(--primary-foreground));
+        opacity: 1;
         box-shadow: 0 1px 3px rgba(0,0,0,0.15);
       }
       .ta-web-terms-title {
@@ -1293,16 +1309,22 @@ function renderStyleToggle() {
   }
   var s = window.__taStyle || "textAppeal";
   var lang = window.__taLang || "en";
+  var caption = lang === "fr" ? "Choix de style" : "Style choice";
   var labels = {
     textAppeal: "Text Appeal",
     clearSimpleInclusive: lang === "fr" ? "Clair et inclusif" : "Clear & Inclusive",
     classicalFrench: lang === "fr" ? "Fran\u00e7ais classique" : "Classical French"
   };
-  var html = '';
-  for (var key in labels) {
-    html += '<button class="ta-style-btn' + (s === key ? ' ta-style-active' : '') + '" onclick="__setStyle(\'' + key + '\')">' + labels[key] + '</button>';
-  }
-  toggle.innerHTML = html;
+  toggle.innerHTML = '<div class="ta-style-caption">' + caption + '</div><div class="ta-style-buttons" id="ta-style-buttons"></div>';
+  var btnContainer = document.getElementById("ta-style-buttons");
+  var keys = ["textAppeal", "clearSimpleInclusive", "classicalFrench"];
+  keys.forEach(function(key) {
+    var btn = document.createElement("button");
+    btn.className = "ta-style-btn" + (s === key ? " ta-style-active" : "");
+    btn.textContent = labels[key];
+    btn.addEventListener("click", function() { __setStyle(key); });
+    btnContainer.appendChild(btn);
+  });
 }
 
 function updatePrinciplesBadge() {
