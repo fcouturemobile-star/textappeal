@@ -2219,7 +2219,15 @@ if (document.readyState === "loading") {
     // Must run AFTER DOM serialization since innerHTML reintroduces newlines
     result = result.replace(/\r\n|\r|\n/g, ' ');
     result = result.replace(/  +/g, ' ');
-    // 11. Merge Word's false paragraph breaks
+    // 11. Split paragraphs at formatting boundaries
+    // When a <p> starts with bold/strong and transitions to non-bold, split there
+    result = splitAtFormattingBoundary(result);
+    // 12. Remove empty strong/em tags
+    result = result.replace(/<strong>\s*<\/strong>/g, '');
+    result = result.replace(/<em>\s*<\/em>/g, '');
+    result = result.replace(/<b>\s*<\/b>/g, '');
+    result = result.replace(/<i>\s*<\/i>/g, '');
+    // 13. Merge Word's false paragraph breaks
     result = mergeWordParagraphs(result);
     return result;
   }
@@ -2266,6 +2274,52 @@ if (document.readyState === "loading") {
     var newEl = document.createElement(newTag);
     while (node.firstChild) newEl.appendChild(node.firstChild);
     parent.replaceChild(newEl, node);
+  }
+
+  function splitAtFormattingBoundary(html) {
+    // When a <p> starts with <strong>/<b> content then transitions to non-bold,
+    // split into separate <p> elements. This fixes Word pasting a bold headline
+    // and body text into the same paragraph.
+    // Works on the HTML string using regex to find <p>...</p> blocks.
+    var re = /<p>([\s\S]*?)<\/p>/gi;
+    var out = '';
+    var lastIndex = 0;
+    var m;
+    while ((m = re.exec(html)) !== null) {
+      // Preserve anything before this <p>
+      out += html.substring(lastIndex, m.index);
+      lastIndex = re.lastIndex;
+      var inner = m[1];
+      // Check: does this <p> start with bold content followed by non-bold?
+      // Pattern: starts with <strong> or <b>, has a closing </strong> or </b>,
+      // then has substantial text content after.
+      var splitMatch = inner.match(
+        /^(\s*<(?:strong|b)>[\s\S]*?<\/(?:strong|b)>(?:\s*<(?:strong|b)>\s*<\/(?:strong|b)>)*)\s*([A-Z\u00C0-\u00DC\u00AB\(\d])/
+      );
+      if (splitMatch) {
+        // We have a bold prefix followed by a capital letter (start of body text)
+        var boldPart = splitMatch[1].trim();
+        var restStart = splitMatch[2];
+        // Find the exact position where the rest starts
+        var boldEndPos = inner.indexOf(restStart, boldPart.length - 1);
+        if (boldEndPos > 0) {
+          var beforeSplit = inner.substring(0, boldEndPos).trim();
+          var afterSplit = inner.substring(boldEndPos).trim();
+          // Only split if both parts have meaningful text
+          var tmpB = document.createElement('div'); tmpB.innerHTML = beforeSplit;
+          var tmpA = document.createElement('div'); tmpA.innerHTML = afterSplit;
+          if (tmpB.textContent.trim() && tmpA.textContent.trim()) {
+            out += '<p>' + beforeSplit + '</p><p>' + afterSplit + '</p>';
+            continue;
+          }
+        }
+      }
+      // No split needed
+      out += m[0];
+    }
+    // Append trailing content
+    if (lastIndex < html.length) out += html.substring(lastIndex);
+    return out;
   }
 
   function mergeWordParagraphs(html) {
@@ -2354,9 +2408,7 @@ if (document.readyState === "loading") {
       // If there's HTML content (from Word, web, etc.), use it with sanitization
       if (html && html.trim()) {
         e.preventDefault();
-        console.log('[PASTE] Raw HTML (first 2000):', html.substring(0, 2000));
         var cleaned = cleanWordHtml(html);
-        console.log('[PASTE] Cleaned HTML:', cleaned.substring(0, 2000));
         // If sanitization produced nothing useful, fall back to plain text
         if (!cleaned.replace(/<[^>]*>/g, '').trim()) {
           cleaned = plain.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
