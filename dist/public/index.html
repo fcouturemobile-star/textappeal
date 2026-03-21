@@ -654,9 +654,33 @@ window.fetch = function(url, opts) {
         setTimeout(function() { renderWebTermSuggestions(); updateTMPaneVisibility(); }, 300);
         setTimeout(function() { renderWebTermSuggestions(); updateTMPaneVisibility(); }, 1000);
         setTimeout(function() { renderWebTermSuggestions(); updateTMPaneVisibility(); }, 2000);
-        // Refresh principles panel to match current style
-        if (typeof __refreshPrinciples === 'function') __refreshPrinciples();
+        // Fetch full principle catalogue for current style (used as cross-reference after rewrite)
+        if (!window.__taAllPrinciples || window.__taAllPrinciples.length === 0) {
+          if (typeof __refreshPrinciples === 'function') __refreshPrinciples();
+        }
       }).catch(function(e) { console.warn('Web terms intercept error:', e); });
+    }
+    // Intercept rewrite response to capture applied principles
+    if (typeof url === "string" && url.includes("/api/rewrite") && resp.ok) {
+      resp.clone().json().then(function(data) {
+        var ids = data.appliedPrinciples || [];
+        window.__taAppliedIds = ids;
+        // Cross-reference with full principle catalogue to get names + explanations
+        var allP = window.__taAllPrinciples || [];
+        if (allP.length > 0 && ids.length > 0) {
+          var idSet = {};
+          ids.forEach(function(id) { idSet[id] = true; });
+          window.__taPrinciplesData = allP.filter(function(p) { return idSet[p.id]; });
+        } else if (ids.length > 0) {
+          // Fallback: build minimal entries from IDs alone (no names yet)
+          window.__taPrinciplesData = ids.map(function(id) { return { id: id, name: '', explanation: '' }; });
+          // Fetch the full list to get names
+          if (typeof __refreshPrinciples === 'function') __refreshPrinciples();
+        } else {
+          window.__taPrinciplesData = [];
+        }
+        window.dispatchEvent(new CustomEvent('ta-principles-updated', { detail: window.__taPrinciplesData }));
+      }).catch(function(e) { console.warn('Rewrite intercept error:', e); });
     }
     // Intercept 402 (limit reached) responses
     if (resp.status === 402) {
@@ -1649,18 +1673,28 @@ function renderLangToggle() {
 window.__taDirection = localStorage.getItem("ta_direction") || "en-fr";
 
 function __refreshPrinciples() {
-  // Re-fetch principles from server with current direction and style
+  // Re-fetch full principle list from server for current direction and style
   var url = '/api/principles?direction=' + (window.__taDirection || 'en-fr') + '&style=' + (window.__taStyle || 'textAppeal');
   origFetch(url).then(function(r) { return r.json(); }).then(function(data) {
-    // Dispatch a custom event so the React app picks up new data
-    window.__taPrinciplesData = data;
-    window.dispatchEvent(new CustomEvent('ta-principles-updated', { detail: data }));
+    // Store the full catalogue for cross-referencing after rewrite
+    window.__taAllPrinciples = data;
+    // If we already have applied-principle IDs from a rewrite, filter; otherwise show nothing until rewrite runs
+    if (window.__taAppliedIds && window.__taAppliedIds.length > 0) {
+      var idSet = {};
+      window.__taAppliedIds.forEach(function(id) { idSet[id] = true; });
+      window.__taPrinciplesData = data.filter(function(p) { return idSet[p.id]; });
+    } else {
+      // No rewrite yet for this style — show empty until rewrite produces applied list
+      window.__taPrinciplesData = [];
+    }
+    window.dispatchEvent(new CustomEvent('ta-principles-updated', { detail: window.__taPrinciplesData }));
   }).catch(function() {});
 }
 
 function __setDirection(dir) {
   window.__taDirection = dir;
   localStorage.setItem("ta_direction", dir);
+  window.__taAppliedIds = [];
   renderDirectionToggle();
   renderStyleToggle();
   __refreshPrinciples();
@@ -1722,6 +1756,8 @@ window.__taStyleOtherText = localStorage.getItem("ta_style_other") || "";
 function __setStyle(style) {
   window.__taStyle = style;
   localStorage.setItem("ta_style", style);
+  // Clear applied principles from previous style — new style needs a fresh rewrite
+  window.__taAppliedIds = [];
   renderStyleToggle();
   updatePrinciplesBadge();
   __refreshPrinciples();
@@ -2334,9 +2370,11 @@ if (document.readyState === "loading") {
                 (hasExp ? '<div class="ta-pr-exp" style="display:none;margin:0 8px 6px 36px;font-size:11px;color:#666;line-height:1.5;background:rgba(0,0,0,0.03);border-radius:6px;padding:6px 10px">' + p.explanation + '</div>' : '');
             });
             _prHtml += '</div>';
+            var _prLabel = window.__taLang === 'fr'
+              ? _prData.length + ' principes appliqu\u00e9s'
+              : _prData.length + ' principles applied';
             prMirror.innerHTML = '<div style="font-size:13px;font-weight:600;padding:0 8px 6px">' +
-              (window.__taLang === 'fr' ? 'Principes' : 'Principles') +
-              ' <span style="font-size:11px;font-weight:400;color:#888">(' + _prData.length + ')</span></div>' + _prHtml;
+              '<span style="color:#d9b53c">\u2728</span> ' + _prLabel + '</div>' + _prHtml;
             prMirror.setAttribute('data-pr-fp', _prFingerprint);
             // Use event delegation on the container so handlers survive any future innerHTML changes
             prMirror.onclick = function(ev) {
@@ -2352,7 +2390,15 @@ if (document.readyState === "loading") {
             };
           }
         } else {
-          prMirror.innerHTML = prPanel.innerHTML;
+          // No applied principles yet — show a placeholder
+          var _emptyMsg = window.__taLang === 'fr'
+            ? 'Les principes appliqu\u00e9s appara\u00eetront ici apr\u00e8s la r\u00e9\u00e9criture.'
+            : 'Applied principles will appear here after rewriting.';
+          prMirror.innerHTML = '<div style="font-size:13px;font-weight:600;padding:0 8px 6px">' +
+            '<span style="color:#d9b53c">\u2728</span> ' +
+            (window.__taLang === 'fr' ? 'Principes appliqu\u00e9s' : 'Applied principles') +
+            '</div>' +
+            '<div style="padding:8px 12px;font-size:12px;color:#999;font-style:italic">' + _emptyMsg + '</div>';
           prMirror.removeAttribute('data-pr-fp');
         }
       }
