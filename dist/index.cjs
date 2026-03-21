@@ -1159,28 +1159,42 @@ var Ss=function(){var _hd=Ri.default.join(process.env.HOME||process.env.USERPROF
     // Build list of terms already in glossary to exclude
     var knownTerms = new Set(glossaryMatches.map(g => g.source.toLowerCase()));
     var _isFrToEn = (direction === "fr-en");
-    var prompt = _isFrToEn ? `You are a terminology extraction assistant. Analyze the following French text and identify 3-8 key technical terms, proper nouns, or specialized vocabulary that would benefit from verified English translations.
+    var prompt = _isFrToEn ? `You are a Canadian bilingual terminology specialist. Analyze the following French text and identify 3-8 key technical terms, proper nouns, or specialized vocabulary that require verified English translations.
 
 EXCLUDE these terms (already in glossary): ${Array.from(knownTerms).join(", ") || "(none)"}
 
-For each term you identify, search the web for its standard English translation. Prefer official Canadian government translations (TERMIUM Plus) when available.
+For each term, search these authoritative Canadian sources IN THIS ORDER OF PRIORITY:
+1. TERMIUM Plus (Government of Canada terminology database - termiumplus.gc.ca)
+2. Grand dictionnaire terminologique (GDT - Office québécois de la langue française - gdt.oqlf.gouv.qc.ca)
+3. Official bilingual Canadian government publications (canada.ca, laws-lois.justice.gc.ca)
+4. IATE (EU terminology database) as fallback
+5. Bilingual Canadian institutional sites (universities, professional associations)
+
+IMPORTANT: Always cite which source you found the term in. Prefer Canadian English usage where applicable.
 
 Return ONLY a JSON array of objects, no other text:
-[{"fr": "French term", "en": "English translation", "source": "where you found it"}]
+[{"fr": "French term", "en": "English translation", "source": "TERMIUM Plus / GDT / canada.ca / etc."}]
 
-If you cannot find a reliable translation for a term, omit it. Return at most 8 terms. Return [] if no terms need lookup.
+If you cannot find a reliable translation from these sources, omit the term. Return at most 8 terms. Return [] if no terms need lookup.
 
 Text to analyze:
-${plainText.substring(0, 2000)}` : `You are a terminology extraction assistant. Analyze the following English text and identify 3-8 key technical terms, proper nouns, or specialized vocabulary that would benefit from verified Canadian French (fr-CA) translations.
+${plainText.substring(0, 2000)}` : `You are a Canadian bilingual terminology specialist. Analyze the following English text and identify 3-8 key technical terms, proper nouns, or specialized vocabulary that require verified Canadian French (fr-CA) translations.
 
 EXCLUDE these terms (already in glossary): ${Array.from(knownTerms).join(", ") || "(none)"}
 
-For each term you identify, search the web for its standard Canadian French translation. Prefer official Canadian government translations (TERMIUM Plus, GDT/Grand dictionnaire terminologique) when available.
+For each term, search these authoritative Canadian sources IN THIS ORDER OF PRIORITY:
+1. TERMIUM Plus (Government of Canada terminology database - termiumplus.gc.ca)
+2. Grand dictionnaire terminologique (GDT - Office québécois de la langue française - gdt.oqlf.gouv.qc.ca)
+3. Official bilingual Canadian government publications (canada.ca, laws-lois.justice.gc.ca)
+4. IATE (EU terminology database) as fallback
+5. Bilingual Canadian institutional sites (universities, professional associations)
+
+IMPORTANT: Always cite which source you found the term in. Prefer Canadian French usage over European French.
 
 Return ONLY a JSON array of objects, no other text:
-[{"en": "English term", "fr": "French translation", "source": "where you found it"}]
+[{"en": "English term", "fr": "Canadian French translation", "source": "TERMIUM Plus / GDT / canada.ca / etc."}]
 
-If you cannot find a reliable translation for a term, omit it. Return at most 8 terms. Return [] if no terms need lookup.
+If you cannot find a reliable translation from these sources, omit the term. Return at most 8 terms. Return [] if no terms need lookup.
 
 Text to analyze:
 ${plainText.substring(0, 2000)}`;
@@ -1240,7 +1254,7 @@ let{text:t,creativity:_cr,direction:_dir}=i.body;var _transDir=_dir||"en-fr";con
 
 `),l+=`"+(_transDir==="fr-en"?"Translate the following French text to English. Preserve all HTML formatting exactly. Each [[GLOSSARY: ...]] annotation tells you the MANDATORY English term to use for that word/phrase":"Translate the following English text to Canadian French. Preserve all HTML formatting exactly. Each [[GLOSSARY: ...]] annotation tells you the MANDATORY French term to use for that word/phrase")+" \u2014 use it exactly as specified, then remove the annotation from your output. When multiple translations are shown separated by " | ", choose the one most appropriate to the context. Output ONLY the translated text \u2014 no explanations, no reasoning, no commentary.
 
-${c}`;var _wtPromise=webTermSearch(r,s,Pi(),_transDir).catch(function(_wte){console.warn("Web term search:",_wte.message);return[]});var _webTerms=await _wtPromise;if(_webTerms&&_webTerms.length>0){var _wtBlock=(_transDir==="fr-en"?"\n\nWeb terminology suggestions (use these specialized terms where applicable):\n":"\n\nSuggestions terminologiques Web (utilisez ces termes sp\u00e9cialis\u00e9s le cas \u00e9ch\u00e9ant) :\n");_webTerms.forEach(function(wt){_wtBlock+=" - "+wt.source+" \u2192 "+wt.target+(wt.context?" ("+wt.context+")":"")+"\n"});l=l+_wtBlock}let u=(await rx(_transDir==="fr-en"?VhReverse:Vh,l,{...Pi(),temperature:(Ga().translateTemperature||_crVal)*1.4})).replace(/\[\[GLOSSARY:[^\]]*\]\]/g,"").replace(/\s{2,}/g," ");return n.json({translation:u,tmMatches:o.slice(0,3),glossaryMatches:s.slice(0,20),webTermSuggestions:_webTerms,localTMEnabled:_localTmEnabled})}catch(t){return console.error("Translation error:",t),n.status(500).json({error:t.message})}}),e.post("/api/rewrite",async(i,n)=>{try{
+${c}`;var _wtPromise=webTermSearch(r,s,Pi(),_transDir).catch(function(_wte){console.warn("Web term search:",_wte.message);return[]});var _webTerms=await _wtPromise;if(_webTerms&&_webTerms.length>0){var _wtBlock=(_transDir==="fr-en"?"\n\nWeb terminology suggestions (use these specialized terms where applicable):\n":"\n\nSuggestions terminologiques Web (utilisez ces termes sp\u00e9cialis\u00e9s le cas \u00e9ch\u00e9ant) :\n");_webTerms.forEach(function(wt){var _src=(_transDir==="fr-en")?wt.fr:wt.en;var _tgt=(_transDir==="fr-en")?wt.en:wt.fr;_wtBlock+=" - "+(_src||"?")+" \u2192 "+(_tgt||"?")+(wt.source?" ["+wt.source+"]":"")+"\n"});l=l+_wtBlock}let u=(await rx(_transDir==="fr-en"?VhReverse:Vh,l,{...Pi(),temperature:(Ga().translateTemperature||_crVal)*1.4})).replace(/\[\[GLOSSARY:[^\]]*\]\]/g,"").replace(/\s{2,}/g," ");return n.json({translation:u,tmMatches:o.slice(0,3),glossaryMatches:s.slice(0,20),webTermSuggestions:_webTerms,localTMEnabled:_localTmEnabled})}catch(t){return console.error("Translation error:",t),n.status(500).json({error:t.message})}}),e.post("/api/rewrite",async(i,n)=>{try{
 // ── Freemium usage tracking ──
 try{const FM=require("../server/freemium.cjs");const db=await FM.getPool();if(db){const ut=i.headers["x-user-token"];if(ut){const[ss]=await db.query("SELECT s.user_id,u.plan,u.requests_this_month,u.month_reset_date,u.subscription_status FROM user_sessions s JOIN users u ON s.user_id=u.id WHERE s.token=? AND s.expires_at>?",[ut,Date.now()]);if(ss.length>0){const uu=ss[0];const[sc]=await db.query("SELECT free_requests_per_month FROM stripe_config WHERE id=1");const fl=sc[0]?.free_requests_per_month||30;if(uu.plan==="free"&&uu.subscription_status!=="active"&&uu.requests_this_month>=fl){return n.status(402).json({error:"limit_reached",message:"You have used all "+fl+" free requests this month. Please upgrade to continue.",usage:uu.requests_this_month,limit:fl})}await db.query("UPDATE users SET requests_this_month=requests_this_month+1 WHERE id=?",[uu.user_id]);await db.query("INSERT INTO usage_log(user_id,request_type)VALUES(?,'rewrite')",[uu.user_id])}}}}catch(ue){console.warn("Usage tracking:",ue.message)}
 let{text:t,creativity:_cr2,style:_style,customStyleText:_cst,direction:_dir2}=i.body;var _stylePrompt=getStylePrompt(_style||"textAppeal",_cst,_dir2||"en-fr");const _crVal2=typeof _cr2==="number"?Math.max(0,Math.min(1,_cr2)):0.3;if(!t)return n.status(400).json({error:"Missing text"});const _crPfx=_crVal2<0.3?"Traduisez aussi littéralement que possible, en restant très fidèle à la structure originale. ":"";var _rwMsg=(_dir2==="fr-en")?`Rework the following text for greater fluency, naturalness, and stylistic impact by applying the style principles. Restructure sentences freely for better flow and readability. Keep the meaning intact but do not hesitate to reformulate. Preserve HTML tags but you may reorganize sentence structure within them. Output ONLY the requested JSON, no reasoning or analysis :`:`R\xE9\xE9crivez le texte suivant pour en am\xE9liorer la fluidit\xE9, le naturel et l\u2019impact stylistique en appliquant les principes de style. Restructurez librement les phrases pour une meilleure lisibilit\xE9. Conservez le sens, mais n\u2019h\xE9sitez pas \xE0 reformuler en profondeur. Pr\xE9servez les balises HTML, mais vous pouvez r\xE9organiser la structure des phrases. Ne produisez que le JSON demand\xE9, sans raisonnement ni analyse :`;let r=await rx(_stylePrompt,_rwMsg+`
