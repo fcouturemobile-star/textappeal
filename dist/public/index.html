@@ -643,6 +643,7 @@ window.fetch = function(url, opts) {
     var _proxy = document.getElementById('ta-proxy-translate-btn');
     if (_proxy) {
       _proxy._savedHTML = _proxy.innerHTML;
+      _proxy.setAttribute('data-ta-spinning', '1');
       _proxy.disabled = true;
       _proxy.style.opacity = '0.7';
       var _spinLabel = url.includes('/api/rewrite')
@@ -678,7 +679,7 @@ window.fetch = function(url, opts) {
     window.__taFreemium.showAuthModal();
     // Remove spinner since we're not actually making the request
     var _p2 = document.getElementById('ta-proxy-translate-btn');
-    if (_p2 && _p2._savedHTML) { _p2.innerHTML = _p2._savedHTML; _p2.disabled = false; _p2.style.opacity = '1'; }
+    if (_p2 && _p2._savedHTML) { _p2.removeAttribute('data-ta-spinning'); _p2.innerHTML = _p2._savedHTML; _p2.disabled = false; _p2.style.opacity = '1'; }
     return Promise.resolve(new Response(JSON.stringify({error: "Login required"}), {status: 401, headers: {"Content-Type": "application/json"}}));
   }
 
@@ -691,7 +692,7 @@ window.fetch = function(url, opts) {
     // Remove spinner from proxy button when translate/rewrite completes
     if (_isTranslateOrRewrite) {
       var _p3 = document.getElementById('ta-proxy-translate-btn');
-      if (_p3 && _p3._savedHTML) { _p3.innerHTML = _p3._savedHTML; _p3.disabled = false; _p3.style.opacity = '1'; }
+      if (_p3) { _p3.removeAttribute('data-ta-spinning'); if (_p3._savedHTML) { _p3.innerHTML = _p3._savedHTML; } _p3.disabled = false; _p3.style.opacity = '1'; }
     }
     // Capture admin token from login response
     if (typeof url === "string" && url.includes("/api/admin/login") && resp.ok) {
@@ -754,7 +755,7 @@ window.fetch = function(url, opts) {
     // Remove spinner on network error too
     if (_isTranslateOrRewrite) {
       var _p4 = document.getElementById('ta-proxy-translate-btn');
-      if (_p4 && _p4._savedHTML) { _p4.innerHTML = _p4._savedHTML; _p4.disabled = false; _p4.style.opacity = '1'; }
+      if (_p4) { _p4.removeAttribute('data-ta-spinning'); if (_p4._savedHTML) { _p4.innerHTML = _p4._savedHTML; } _p4.disabled = false; _p4.style.opacity = '1'; }
     }
     throw err;
   });
@@ -2402,9 +2403,12 @@ if (document.readyState === "loading") {
         btnSlot.appendChild(proxy);
       }
       // Mirror the label and disabled state from the real button
-      proxy.disabled = btnBar.disabled;
-      proxy.style.opacity = btnBar.disabled ? '0.5' : '1';
-      proxy.innerHTML = btnBar.innerHTML;
+      // BUT skip if our spinner is active (don't overwrite spinner with React's content)
+      if (!proxy.hasAttribute('data-ta-spinning')) {
+        proxy.disabled = btnBar.disabled;
+        proxy.style.opacity = btnBar.disabled ? '0.5' : '1';
+        proxy.innerHTML = btnBar.innerHTML;
+      }
     }
 
     // ── Create center column wrapper (always, regardless of TM state) ──
