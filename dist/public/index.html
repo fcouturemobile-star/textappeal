@@ -723,7 +723,10 @@ window.fetch = function(url, opts) {
     // Intercept rewrite response to capture applied principles
     if (typeof url === "string" && url.includes("/api/rewrite") && resp.ok) {
       resp.clone().json().then(function(data) {
-        var ids = data.appliedPrinciples || [];
+        var _rawIds = data.appliedPrinciples || [];
+        // Deduplicate — LLM sometimes returns the same principle number twice
+        var _seen = {};
+        var ids = _rawIds.filter(function(id) { if (_seen[id]) return false; _seen[id] = true; return true; });
         window.__taAppliedIds = ids;
         // Cross-reference with full principle catalogue to get names + explanations
         var allP = window.__taAllPrinciples || [];
