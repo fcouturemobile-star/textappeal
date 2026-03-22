@@ -27,6 +27,7 @@
     <script type="module" crossorigin src="./assets/index-CHn3W7iT.js"></script>
     <link rel="stylesheet" crossorigin href="./assets/index-BmT-Nf-e.css">
     <style>
+      @keyframes ta-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       /* Hide the React LLM config temperature slider — replaced by dual sliders in overlay */
       input[type="range"][data-testid="slider"] { display: none !important; }
       input[type="range"][data-testid="slider"] ~ p { display: none !important; }
@@ -636,6 +637,20 @@ window.fetch = function(url, opts) {
     // Always override with current direction and style
     url = '/api/principles?direction=' + (window.__taDirection || 'en-fr') + '&style=' + (window.__taStyle || 'textAppeal');
   }
+  // Show spinner on proxy button when translate/rewrite is in flight
+  var _isTranslateOrRewrite = typeof url === "string" && (url.includes("/api/translate") || url.includes("/api/rewrite")) && opts.method && opts.method.toUpperCase() === "POST";
+  if (_isTranslateOrRewrite) {
+    var _proxy = document.getElementById('ta-proxy-translate-btn');
+    if (_proxy) {
+      _proxy._savedHTML = _proxy.innerHTML;
+      _proxy.disabled = true;
+      _proxy.style.opacity = '0.7';
+      var _spinLabel = url.includes('/api/rewrite')
+        ? (window.__taLang === 'fr' ? 'R\u00e9\u00e9criture...' : 'Rewriting...')
+        : (window.__taLang === 'fr' ? 'Traduction...' : 'Translating...');
+      _proxy.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:ta-spin 0.8s linear infinite;flex-shrink:0"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ' + _spinLabel;
+    }
+  }
   // Inject direction into translate requests and capture translation result
   if (typeof url === "string" && url.includes("/api/translate") && opts.body) {
     try {
@@ -661,6 +676,9 @@ window.fetch = function(url, opts) {
   // Gate: require login for translate/rewrite
   if (window.__taRequireLogin && typeof url === "string" && (url.includes("/api/translate") || url.includes("/api/rewrite"))) {
     window.__taFreemium.showAuthModal();
+    // Remove spinner since we're not actually making the request
+    var _p2 = document.getElementById('ta-proxy-translate-btn');
+    if (_p2 && _p2._savedHTML) { _p2.innerHTML = _p2._savedHTML; _p2.disabled = false; _p2.style.opacity = '1'; }
     return Promise.resolve(new Response(JSON.stringify({error: "Login required"}), {status: 401, headers: {"Content-Type": "application/json"}}));
   }
 
@@ -670,6 +688,11 @@ window.fetch = function(url, opts) {
     if (at) capturedAdminToken = at;
   }
   return origFetch.call(this, url, opts).then(function(resp) {
+    // Remove spinner from proxy button when translate/rewrite completes
+    if (_isTranslateOrRewrite) {
+      var _p3 = document.getElementById('ta-proxy-translate-btn');
+      if (_p3 && _p3._savedHTML) { _p3.innerHTML = _p3._savedHTML; _p3.disabled = false; _p3.style.opacity = '1'; }
+    }
     // Capture admin token from login response
     if (typeof url === "string" && url.includes("/api/admin/login") && resp.ok) {
       resp.clone().json().then(function(data) {
@@ -727,6 +750,13 @@ window.fetch = function(url, opts) {
       });
     }
     return resp;
+  }).catch(function(err) {
+    // Remove spinner on network error too
+    if (_isTranslateOrRewrite) {
+      var _p4 = document.getElementById('ta-proxy-translate-btn');
+      if (_p4 && _p4._savedHTML) { _p4.innerHTML = _p4._savedHTML; _p4.disabled = false; _p4.style.opacity = '1'; }
+    }
+    throw err;
   });
 };
 
