@@ -2387,8 +2387,10 @@ if (document.readyState === "loading") {
     var btnSlot = document.getElementById('ta-btn-slot');
     if (btnBar && btnSlot) {
       // Hide the original button's wrapper inside the grid
+      // Use visibility:hidden + zero size instead of display:none
+      // because Safari won't fire .click() on elements inside display:none containers
       var origBtnWrapper = btnBar.closest('.border-t');
-      if (origBtnWrapper) origBtnWrapper.style.display = 'none';
+      if (origBtnWrapper) origBtnWrapper.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;';
 
       // Create or update a PROXY button inside our bottom-left pane
       var proxyId = 'ta-proxy-translate-btn';
@@ -2545,7 +2547,7 @@ if (document.readyState === "loading") {
     var inGridBtn = grid.querySelectorAll('[data-testid="button-translate"]');
     for (var b = 0; b < inGridBtn.length; b++) {
       var btnWr = inGridBtn[b].closest('.border-t');
-      if (btnWr) btnWr.style.display = 'none';
+      if (btnWr) btnWr.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;visibility:hidden;pointer-events:none;';
     }
   }
 
