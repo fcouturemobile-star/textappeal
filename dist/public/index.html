@@ -31,6 +31,122 @@
     <link rel="stylesheet" crossorigin href="./assets/index-BmT-Nf-e.css">
     <style>
       @keyframes ta-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+      /* ── Mobile UI: hide desktop, show mobile app ── */
+      @media (max-width: 767px) {
+        #root { display: none !important; }
+        #ta-bottom-panels { display: none !important; }
+        .ta-user-bar { display: none !important; }
+        #ta-hero-cta { display: none !important; }
+        #ta-mobile-app { display: flex !important; }
+      }
+      #ta-mobile-app { display: none; }
+      #ta-mobile-app {
+        flex-direction: column;
+        height: 100dvh;
+        font-family: 'DM Sans', sans-serif;
+        background: hsl(var(--background, 0 0% 100%));
+        color: hsl(var(--foreground, 0 0% 3.9%));
+      }
+      .ta-m-header {
+        padding: 10px 14px;
+        border-bottom: 1px solid hsl(var(--border, 0 0% 89.8%));
+        flex-shrink: 0;
+      }
+      .ta-m-title {
+        font-size: 15px;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+      .ta-m-controls {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .ta-m-controls select, .ta-m-controls button {
+        font-size: 12px;
+        padding: 5px 8px;
+        border-radius: 6px;
+        border: 1px solid hsl(var(--border, 0 0% 89.8%));
+        background: hsl(var(--background, 0 0% 100%));
+        color: hsl(var(--foreground, 0 0% 3.9%));
+        cursor: pointer;
+      }
+      .ta-m-controls .ta-m-dir-active {
+        background: hsl(var(--primary, 0 0% 9%));
+        color: hsl(var(--primary-foreground, 0 0% 98%));
+        border-color: transparent;
+      }
+      .ta-m-pane {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 10px 14px;
+        gap: 6px;
+      }
+      .ta-m-pane label {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        color: hsl(var(--muted-foreground, 0 0% 45.1%));
+      }
+      .ta-m-input {
+        flex: 1;
+        min-height: 80px;
+        border: 1px solid hsl(var(--border, 0 0% 89.8%));
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 14px;
+        font-family: inherit;
+        resize: none;
+        background: hsl(var(--background, 0 0% 100%));
+        color: hsl(var(--foreground, 0 0% 3.9%));
+        overflow-y: auto;
+      }
+      .ta-m-output {
+        flex: 1;
+        min-height: 80px;
+        border: 1px solid hsl(var(--border, 0 0% 89.8%));
+        border-radius: 8px;
+        padding: 10px;
+        font-size: 14px;
+        overflow-y: auto;
+        background: rgba(0,0,0,0.02);
+      }
+      .ta-m-btn-translate {
+        width: 100%;
+        padding: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        border-radius: 8px;
+        border: none;
+        background: hsl(var(--primary, 0 0% 9%));
+        color: hsl(var(--primary-foreground, 0 0% 98%));
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        flex-shrink: 0;
+      }
+      .ta-m-btn-translate:disabled { opacity: 0.5; cursor: not-allowed; }
+      .ta-m-principles {
+        padding: 0 14px 10px;
+        flex-shrink: 0;
+        max-height: 120px;
+        overflow-y: auto;
+      }
+      .ta-m-footer {
+        padding: 8px 14px;
+        font-size: 10px;
+        color: hsl(var(--muted-foreground, 0 0% 45.1%));
+        text-align: center;
+        border-top: 1px solid hsl(var(--border, 0 0% 89.8%));
+        flex-shrink: 0;
+      }
       /* Hide the React LLM config temperature slider — replaced by dual sliders in overlay */
       input[type="range"][data-testid="slider"] { display: none !important; }
       input[type="range"][data-testid="slider"] ~ p { display: none !important; }
@@ -1222,6 +1338,143 @@ function injectAdminSections() {
       _hideOldTempSlider();
       var _hideOldInterval = setInterval(function() { if (_hideOldTempSlider()) clearInterval(_hideOldInterval); }, 200);
       setTimeout(function() { clearInterval(_hideOldInterval); }, 10000);
+
+      // ── Inject AWS Bedrock provider button into React LLM config ──
+      (function() {
+        function injectBedrockUI() {
+          var groqBtn = document.querySelector('[data-testid="button-provider-groq"]');
+          if (!groqBtn || document.getElementById('ta-bedrock-btn')) return false;
+          // Add Bedrock button after Groq
+          var brBtn = document.createElement('button');
+          brBtn.id = 'ta-bedrock-btn';
+          brBtn.className = groqBtn.className.replace(/default/, 'outline');
+          brBtn.setAttribute('data-testid', 'button-provider-bedrock');
+          brBtn.textContent = 'AWS Bedrock';
+          brBtn.style.cssText = groqBtn.style.cssText;
+          groqBtn.parentElement.appendChild(brBtn);
+
+          // Create Bedrock config form (hidden initially)
+          var brForm = document.createElement('div');
+          brForm.id = 'ta-bedrock-form';
+          brForm.style.display = 'none';
+          brForm.innerHTML = '<div style="margin-top:12px;display:flex;flex-direction:column;gap:10px">' +
+            '<p style="font-size:12px;color:var(--muted-foreground,#64748b)">Data stays in your chosen AWS region. Zero US transit. SigV4-signed requests.</p>' +
+            '<label style="font-size:13px;font-weight:600">AWS Region</label>' +
+            '<select id="ta-br-region" style="padding:6px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
+            '<option value="ca-central-1">ca-central-1 (Montreal) \u2014 Canada</option>' +
+            '<option value="eu-central-1">eu-central-1 (Frankfurt) \u2014 EU</option>' +
+            '<option value="eu-west-1">eu-west-1 (Ireland) \u2014 EU</option>' +
+            '<option value="eu-west-3">eu-west-3 (Paris) \u2014 EU</option>' +
+            '<option value="eu-west-2">eu-west-2 (London) \u2014 UK</option>' +
+            '<option value="eu-central-2">eu-central-2 (Zurich) \u2014 EU</option>' +
+            '</select>' +
+            '<label style="font-size:13px;font-weight:600">Model</label>' +
+            '<select id="ta-br-model" style="padding:6px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
+            '<option value="anthropic.claude-opus-4-6-20260205-v1:0">Claude Opus 4.6</option>' +
+            '<option value="anthropic.claude-sonnet-4-6-20260205-v1:0">Claude Sonnet 4.6</option>' +
+            '<option value="anthropic.claude-opus-4-20250514-v1:0">Claude Opus 4</option>' +
+            '<option value="anthropic.claude-sonnet-4-20250514-v1:0">Claude Sonnet 4</option>' +
+            '<option value="anthropic.claude-3-7-sonnet-20250219-v1:0">Claude 3.7 Sonnet</option>' +
+            '<option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet v2</option>' +
+            '<option value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus</option>' +
+            '</select>' +
+            '<label style="font-size:13px;font-weight:600">AWS Access Key ID</label>' +
+            '<input id="ta-br-access" type="text" placeholder="AKIA..." style="padding:6px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;font-family:monospace">' +
+            '<label style="font-size:13px;font-weight:600">AWS Secret Access Key</label>' +
+            '<input id="ta-br-secret" type="password" placeholder="Secret key" style="padding:6px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;font-family:monospace">' +
+            '<div style="display:flex;gap:8px;align-items:center;margin-top:4px">' +
+            '<button id="ta-br-save" class="ta-btn ta-btn-primary" style="font-size:12px;padding:6px 16px">Save Bedrock Config</button>' +
+            '<span id="ta-br-status" style="font-size:12px;color:var(--muted-foreground,#64748b)"></span>' +
+            '</div>' +
+            '<div style="font-size:11px;color:var(--muted-foreground,#64748b);margin-top:4px;padding:8px;background:rgba(0,0,0,0.03);border-radius:6px">' +
+            '<strong>Setup:</strong> Create an IAM user in AWS Console with <code>bedrock:InvokeModel</code> permission. Enable Claude model access in Bedrock > Model access for your chosen region.' +
+            '</div>' +
+            '</div>';
+          // Insert form after the LLM config card content
+          var llmCard = groqBtn.closest('.space-y-4, .space-y-6, [class*="space-y"]');
+          if (llmCard) llmCard.appendChild(brForm);
+          else groqBtn.parentElement.parentElement.appendChild(brForm);
+
+          // Load current config
+          (async function() {
+            try {
+              var at = getAdminToken();
+              var r = await origFetch('/api/admin/llm', { headers: { 'x-admin-token': at } });
+              if (r.ok) {
+                var d = await r.json();
+                if (d.bedrockRegion) document.getElementById('ta-br-region').value = d.bedrockRegion;
+                if (d.bedrockAccessKeyMasked) document.getElementById('ta-br-access').placeholder = d.bedrockAccessKeyMasked || 'AKIA...';
+                if (d.bedrockSecretKeyMasked) document.getElementById('ta-br-secret').placeholder = d.bedrockSecretKeyMasked || 'Secret key';
+                if (d.providerType === 'bedrock' && d.model) {
+                  var modelSel = document.getElementById('ta-br-model');
+                  for (var o of modelSel.options) { if (o.value === d.model) { o.selected = true; break; } }
+                }
+                // If currently bedrock, show form and highlight button
+                if (d.providerType === 'bedrock') {
+                  brForm.style.display = '';
+                  brBtn.className = brBtn.className.replace(/outline/, 'default');
+                }
+              }
+            } catch(e) {}
+          })();
+
+          // Click handler: show bedrock form, hide React form fields
+          brBtn.addEventListener('click', function() {
+            brForm.style.display = '';
+            // Reset other provider buttons to outline
+            ['anthropic','openai','openrouter','groq'].forEach(function(p) {
+              var b = document.querySelector('[data-testid="button-provider-' + p + '"]');
+              if (b) b.className = b.className.replace(/default/, 'outline');
+            });
+            brBtn.className = brBtn.className.replace(/outline/, 'default');
+          });
+
+          // When other provider buttons are clicked, hide bedrock form
+          ['anthropic','openai','openrouter','groq'].forEach(function(p) {
+            var b = document.querySelector('[data-testid="button-provider-' + p + '"]');
+            if (b) b.addEventListener('click', function() {
+              brForm.style.display = 'none';
+              brBtn.className = brBtn.className.replace(/default/, 'outline');
+            });
+          });
+
+          // Save handler
+          document.getElementById('ta-br-save').addEventListener('click', async function() {
+            var status = document.getElementById('ta-br-status');
+            status.textContent = 'Saving...';
+            try {
+              var at = getAdminToken();
+              var r = await origFetch('/api/admin/llm', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'x-admin-token': at },
+                body: JSON.stringify({
+                  providerType: 'bedrock',
+                  endpoint: 'bedrock',
+                  model: document.getElementById('ta-br-model').value,
+                  bedrockRegion: document.getElementById('ta-br-region').value,
+                  bedrockAccessKey: document.getElementById('ta-br-access').value || '',
+                  bedrockSecretKey: document.getElementById('ta-br-secret').value || ''
+                })
+              });
+              if (r.ok) {
+                status.textContent = 'Saved. Data stays in ' + document.getElementById('ta-br-region').value;
+                status.style.color = '#22c55e';
+              } else {
+                var d = await r.json();
+                status.textContent = 'Error: ' + (d.error || r.status);
+                status.style.color = '#ef4444';
+              }
+              setTimeout(function() { status.textContent = ''; status.style.color = ''; }, 5000);
+            } catch(e) { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; }
+          });
+          return true;
+        }
+        // Try injecting immediately and with retries
+        if (!injectBedrockUI()) {
+          var _brInt = setInterval(function() { if (injectBedrockUI()) clearInterval(_brInt); }, 500);
+          setTimeout(function() { clearInterval(_brInt); }, 15000);
+        }
+      })();
 
       // Wire up local TM toggle
       (async function() {
@@ -2993,6 +3246,168 @@ function updateTMPaneVisibility() {
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startZdr);
   else startZdr();
+})();
+</script>
+
+<!-- ═══ Mobile App UI ═══ -->
+<div id="ta-mobile-app">
+  <div class="ta-m-header">
+    <div class="ta-m-title">Text Appeal™</div>
+    <div class="ta-m-controls">
+      <button id="ta-m-dir-enfr" class="ta-m-dir-active">EN → FR</button>
+      <button id="ta-m-dir-fren">FR → EN</button>
+      <select id="ta-m-style">
+        <option value="textAppeal">Text Appeal™</option>
+        <option value="clearSimpleInclusive" id="ta-m-style-csi">Clear &amp; Inclusive</option>
+        <option value="classicalFrench" id="ta-m-style-cf">Classical French</option>
+      </select>
+    </div>
+  </div>
+  <div class="ta-m-pane">
+    <label id="ta-m-input-label">Source text (English)</label>
+    <textarea class="ta-m-input" id="ta-m-input" placeholder="Paste your text here (ideally a single paragraph)"></textarea>
+  </div>
+  <div style="padding:0 14px;flex-shrink:0">
+    <button class="ta-m-btn-translate" id="ta-m-translate">Translate &amp; Rewrite</button>
+  </div>
+  <div class="ta-m-pane">
+    <label id="ta-m-output-label">Rewritten result</label>
+    <div class="ta-m-output" id="ta-m-output"></div>
+  </div>
+  <div class="ta-m-principles" id="ta-m-principles"></div>
+  <div class="ta-m-footer">
+    AI is not infallible. This tool assists but does not replace professional judgment.<br>
+    <a href="https://www.textappeal.pro" style="color:inherit">www.textappeal.pro</a> · © François Couture
+  </div>
+</div>
+
+<script>
+// ═══ Mobile App Logic ═══
+(function() {
+  if (window.innerWidth >= 768) return; // Skip on desktop
+
+  var dir = localStorage.getItem('ta_direction') || 'en-fr';
+  var style = localStorage.getItem('ta_style') || 'textAppeal';
+  var lang = localStorage.getItem('ta_lang') || 'en';
+
+  var btnEnFr = document.getElementById('ta-m-dir-enfr');
+  var btnFrEn = document.getElementById('ta-m-dir-fren');
+  var styleSel = document.getElementById('ta-m-style');
+  var inputLabel = document.getElementById('ta-m-input-label');
+  var outputLabel = document.getElementById('ta-m-output-label');
+  var input = document.getElementById('ta-m-input');
+  var output = document.getElementById('ta-m-output');
+  var translateBtn = document.getElementById('ta-m-translate');
+  var principlesDiv = document.getElementById('ta-m-principles');
+
+  function updateLabels() {
+    var isFr = (dir === 'fr-en');
+    inputLabel.textContent = isFr ? 'Texte source (fran\u00e7ais)' : 'Source text (English)';
+    outputLabel.textContent = isFr ? 'R\u00e9sultat r\u00e9\u00e9crit' : 'Rewritten result';
+    translateBtn.innerHTML = isFr ? 'Traduire et r\u00e9\u00e9crire' : 'Translate &amp; Rewrite';
+    input.placeholder = isFr ? 'Collez votre texte ici (id\u00e9alement un seul paragraphe)' : 'Paste your text here (ideally a single paragraph)';
+    // Update style labels based on direction
+    var csi = document.getElementById('ta-m-style-csi');
+    var cf = document.getElementById('ta-m-style-cf');
+    if (isFr) {
+      csi.textContent = 'Clear & Inclusive';
+      cf.textContent = 'Classical English';
+    } else {
+      csi.textContent = 'Clair et inclusif';
+      cf.textContent = 'Fran\u00e7ais classique';
+    }
+    btnEnFr.className = dir === 'en-fr' ? 'ta-m-dir-active' : '';
+    btnFrEn.className = dir === 'fr-en' ? 'ta-m-dir-active' : '';
+    styleSel.value = style;
+  }
+
+  btnEnFr.addEventListener('click', function() { dir = 'en-fr'; localStorage.setItem('ta_direction', dir); updateLabels(); });
+  btnFrEn.addEventListener('click', function() { dir = 'fr-en'; localStorage.setItem('ta_direction', dir); updateLabels(); });
+  styleSel.addEventListener('change', function() { style = this.value; localStorage.setItem('ta_style', style); });
+  updateLabels();
+
+  // Translate + Rewrite in one tap
+  translateBtn.addEventListener('click', async function() {
+    var text = input.value.trim();
+    if (!text) return;
+
+    translateBtn.disabled = true;
+    translateBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:ta-spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ' +
+      (dir === 'fr-en' ? 'Translating...' : 'Traduction...');
+    output.innerHTML = '';
+    principlesDiv.innerHTML = '';
+
+    try {
+      // Get user token if logged in
+      var token = localStorage.getItem('ta_user_token');
+      var headers = { 'Content-Type': 'application/json' };
+      if (token) headers['x-user-token'] = token;
+
+      // Step 1: Translate
+      var transResp = await fetch('/api/translate', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ text: '<p>' + text.replace(/\n/g, '</p><p>') + '</p>', direction: dir })
+      });
+      if (!transResp.ok) {
+        var err = await transResp.json().catch(function() { return { error: 'Translation failed' }; });
+        throw new Error(err.error || err.message || 'Translation failed');
+      }
+      var transData = await transResp.json();
+      var translation = transData.translation || '';
+
+      // Update spinner for rewrite phase
+      translateBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:ta-spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ' +
+        (dir === 'fr-en' ? 'Rewriting...' : 'R\u00e9\u00e9criture...');
+
+      // Step 2: Rewrite
+      var rwResp = await fetch('/api/rewrite', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ text: translation, style: style, direction: dir })
+      });
+      if (!rwResp.ok) {
+        var err2 = await rwResp.json().catch(function() { return { error: 'Rewrite failed' }; });
+        throw new Error(err2.error || err2.message || 'Rewrite failed');
+      }
+      var rwData = await rwResp.json();
+      var rewritten = rwData.rewritten || translation;
+      var applied = rwData.appliedPrinciples || [];
+
+      // Show result
+      output.innerHTML = '<div class="rich-text-output">' + rewritten + '</div>';
+
+      // Show applied principles (deduplicated)
+      if (applied.length > 0) {
+        var seen = {};
+        var unique = applied.filter(function(id) { if (seen[id]) return false; seen[id] = true; return true; });
+        // Fetch principle names
+        try {
+          var prResp = await fetch('/api/principles?direction=' + dir + '&style=' + style);
+          if (prResp.ok) {
+            var allPr = await prResp.json();
+            var idMap = {};
+            allPr.forEach(function(p) { idMap[p.id] = p; });
+            var html = '<div style="font-size:12px;font-weight:600;color:hsl(var(--muted-foreground));margin-bottom:4px">' +
+              unique.length + (dir === 'fr-en' ? ' principles applied' : ' principes appliqu\u00e9s') + '</div>';
+            unique.forEach(function(id) {
+              var p = idMap[id];
+              if (p) {
+                html += '<span style="display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(217,181,60,0.12);color:#b88f0a;border:1px solid rgba(217,181,60,0.25);margin:2px 3px 2px 0">#' + p.id + ' ' + p.name + '</span>';
+              }
+            });
+            principlesDiv.innerHTML = html;
+          }
+        } catch(e) {}
+      }
+
+    } catch(e) {
+      output.innerHTML = '<div style="color:#ef4444;padding:8px">' + (e.message || 'An error occurred') + '</div>';
+    } finally {
+      translateBtn.disabled = false;
+      translateBtn.innerHTML = dir === 'fr-en' ? 'Translate &amp; Rewrite' : 'Traduire et r\u00e9\u00e9crire';
+    }
+  });
 })();
 </script>
 
