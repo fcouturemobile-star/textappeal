@@ -3392,24 +3392,23 @@ function updateTMPaneVisibility() {
   if (otherInput) otherInput.value = customText;
 
   function updateLabels() {
-    var isFr = (dir === 'fr-en');
-    inputLabel.textContent = isFr ? 'Texte source (fran\u00e7ais)' : 'Source text (English)';
-    outputLabel.textContent = isFr ? 'R\u00e9sultat r\u00e9\u00e9crit' : 'Rewritten result';
-    translateBtn.innerHTML = dir === 'en-fr' ? 'Translate and Rewrite' : 'Traduire et r\u00e9\u00e9crire';
-    input.placeholder = isFr ? 'Collez votre texte ici (id\u00e9alement un seul paragraphe)' : 'Paste your text here (ideally a single paragraph)';
-    // Update style labels based on target language (direction)
+    var _uiIsEn = (window.__taLang || 'en') === 'en';
+    var _srcLang = (dir === 'en-fr') ? (_uiIsEn ? 'English' : 'anglais') : (_uiIsEn ? 'French' : 'fran\u00e7ais');
+    inputLabel.textContent = (_uiIsEn ? 'Source text' : 'Texte source') + ' (' + _srcLang + ')';
+    outputLabel.textContent = _uiIsEn ? 'Rewritten result' : 'R\u00e9sultat r\u00e9\u00e9crit';
+    translateBtn.innerHTML = _uiIsEn ? 'Translate and Rewrite' : 'Traduire et r\u00e9\u00e9crire';
+    input.placeholder = _uiIsEn ? 'Paste your text here (ideally a single paragraph)' : 'Collez votre texte ici (id\u00e9alement un seul paragraphe)';
+    // Update style labels based on UI language
+    var _uiEn = (window.__taLang || 'en') === 'en';
+    var _targetFr = (dir === 'en-fr');
     var csi = document.getElementById('ta-m-style-csi');
     var cf = document.getElementById('ta-m-style-cf');
     var otherBtn = document.getElementById('ta-m-style-other-btn');
-    if (isFr) {
-      csi.textContent = 'Clear & Inclusive';
-      cf.textContent = 'Classical English';
-      if (otherBtn) otherBtn.textContent = 'Other:';
-    } else {
-      csi.textContent = 'Clair et inclusif';
-      cf.textContent = 'Fran\u00e7ais classique';
-      if (otherBtn) otherBtn.textContent = 'Autre :';
-    }
+    csi.textContent = _uiEn ? 'Clear & Inclusive' : 'Clair et inclusif';
+    cf.textContent = _uiEn
+      ? (_targetFr ? 'Classical French' : 'Classical English')
+      : (_targetFr ? 'Fran\u00e7ais classique' : 'Anglais classique');
+    if (otherBtn) otherBtn.textContent = _uiEn ? 'Other:' : 'Autre :';
     btnEnFr.className = dir === 'en-fr' ? 'ta-m-dir-active' : '';
     btnFrEn.className = dir === 'fr-en' ? 'ta-m-dir-active' : '';
     // Update active style button
@@ -3445,7 +3444,7 @@ function updateTMPaneVisibility() {
 
     translateBtn.disabled = true;
     translateBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:ta-spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ' +
-      (dir === 'en-fr' ? 'Translating...' : 'Traduction...');
+      ((window.__taLang||'en')==='en' ? 'Translating...' : 'Traduction...');
     output.innerHTML = '';
     var shareDiv0 = document.getElementById('ta-m-share');
     if (shareDiv0) shareDiv0.style.display = 'none';
@@ -3471,7 +3470,7 @@ function updateTMPaneVisibility() {
 
       // Update spinner for rewrite phase
       translateBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="animation:ta-spin 0.8s linear infinite"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg> ' +
-        (dir === 'en-fr' ? 'Rewriting...' : 'R\u00e9\u00e9criture...');
+        ((window.__taLang||'en')==='en' ? 'Rewriting...' : 'R\u00e9\u00e9criture...');
 
       // Step 2: Rewrite
       var rwResp = await fetch('/api/rewrite', {
@@ -3498,7 +3497,7 @@ function updateTMPaneVisibility() {
       output.innerHTML = '<div style="color:#ef4444;padding:8px">' + (e.message || 'An error occurred') + '</div>';
     } finally {
       translateBtn.disabled = false;
-      translateBtn.innerHTML = dir === 'en-fr' ? 'Translate and Rewrite' : 'Traduire et r\u00e9\u00e9crire';
+      translateBtn.innerHTML = (window.__taLang||'en')==='en' ? 'Translate and Rewrite' : 'Traduire et r\u00e9\u00e9crire';
     }
   });
 
