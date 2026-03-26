@@ -43,6 +43,10 @@
         #ta-bottom-panels { display: none !important; }
         .ta-user-bar { display: none !important; }
         #ta-hero-cta { display: none !important; }
+        #ta-lang-toggle { display: none !important; }
+        #ta-usage-counter { display: none !important; }
+        .ta-zdr-notice { display: none !important; }
+        #ta-upgrade-modal { display: none !important; }
         #ta-mobile-app { display: flex !important; }
       }
       #ta-mobile-app { display: none; }
@@ -3280,7 +3284,19 @@ function updateTMPaneVisibility() {
 <!-- ═══ Mobile App UI ═══ -->
 <div id="ta-mobile-app">
   <div class="ta-m-header">
-    <div class="ta-m-title">Text Appeal™</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div class="ta-m-title" style="margin:0">Text Appeal™</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div id="ta-m-lang" style="display:flex;align-items:center;gap:2px;font-size:11px">
+          <button id="ta-m-lang-en" style="padding:2px 6px;border-radius:4px;border:1px solid hsl(var(--border,0 0% 89.8%));background:hsl(var(--primary));color:hsl(var(--primary-foreground));cursor:pointer;font-size:11px;font-weight:600">EN</button>
+          <button id="ta-m-lang-fr" style="padding:2px 6px;border-radius:4px;border:1px solid hsl(var(--border,0 0% 89.8%));background:hsl(var(--background));color:hsl(var(--foreground));cursor:pointer;font-size:11px;font-weight:600">FR</button>
+        </div>
+        <button id="ta-m-login-btn" style="font-size:11px;padding:4px 10px;border-radius:6px;border:1px solid hsl(var(--border,0 0% 89.8%));background:hsl(var(--background));color:hsl(var(--foreground));cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:4px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          <span id="ta-m-login-label">Log in</span>
+        </button>
+      </div>
+    </div>
     <div class="ta-m-controls">
       <button id="ta-m-dir-enfr" class="ta-m-dir-active">EN → FR</button>
       <button id="ta-m-dir-fren">FR → EN</button>
@@ -3386,8 +3402,8 @@ function updateTMPaneVisibility() {
     if (otherRow) otherRow.style.display = style === 'other' ? '' : 'none';
   }
 
-  btnEnFr.addEventListener('click', function() { dir = 'en-fr'; localStorage.setItem('ta_direction', dir); updateLabels(); });
-  btnFrEn.addEventListener('click', function() { dir = 'fr-en'; localStorage.setItem('ta_direction', dir); updateLabels(); });
+  btnEnFr.addEventListener('click', function() { dir = 'en-fr'; localStorage.setItem('ta_direction', dir); updateLabels(); updateMobileLoginState(); });
+  btnFrEn.addEventListener('click', function() { dir = 'fr-en'; localStorage.setItem('ta_direction', dir); updateLabels(); updateMobileLoginState(); });
   styleBtns.forEach(function(btn) {
     btn.addEventListener('click', function() {
       style = this.getAttribute('data-style');
@@ -3465,6 +3481,88 @@ function updateTMPaneVisibility() {
       translateBtn.disabled = false;
       translateBtn.innerHTML = dir === 'en-fr' ? 'Translate and Rewrite' : 'Traduire et r\u00e9\u00e9crire';
     }
+  });
+
+  // ── Mobile login button ──
+  var mLoginBtn = document.getElementById('ta-m-login-btn');
+  var mLoginLabel = document.getElementById('ta-m-login-label');
+
+  function updateMobileLoginState() {
+    var token = localStorage.getItem('ta_user_token');
+    if (token) {
+      // Try to get user info from the freemium system
+      fetch('/api/user/me', { headers: { 'x-user-token': token } })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(d) {
+          if (d && d.user) {
+            mLoginLabel.textContent = d.user.displayName || d.user.email || 'Account';
+            mLoginBtn.onclick = function() {
+              if (confirm(dir === 'en-fr' ? 'Log out?' : 'Se d\u00e9connecter?')) {
+                fetch('/api/user/logout', { method: 'POST', headers: { 'x-user-token': token } });
+                localStorage.removeItem('ta_user_token');
+                mLoginLabel.textContent = dir === 'en-fr' ? 'Log in' : 'Connexion';
+                updateMobileLoginState();
+              }
+            };
+          } else {
+            localStorage.removeItem('ta_user_token');
+            setLoggedOutState();
+          }
+        }).catch(function() { setLoggedOutState(); });
+    } else {
+      setLoggedOutState();
+    }
+  }
+
+  function setLoggedOutState() {
+    mLoginLabel.textContent = dir === 'en-fr' ? 'Log in' : 'Connexion';
+    mLoginBtn.onclick = function() {
+      // Use the desktop freemium auth modal if available
+      if (window.__taFreemium && window.__taFreemium.showAuthModal) {
+        window.__taFreemium.showAuthModal('login');
+      } else {
+        window.location.hash = '#/login';
+      }
+    };
+  }
+
+  updateMobileLoginState();
+
+  // ── Mobile UI language toggle ──
+  var mLangEn = document.getElementById('ta-m-lang-en');
+  var mLangFr = document.getElementById('ta-m-lang-fr');
+  var uiLang = localStorage.getItem('ta_lang') || 'en';
+
+  function updateMobileLangButtons() {
+    if (uiLang === 'en') {
+      mLangEn.style.background = 'hsl(var(--primary))';
+      mLangEn.style.color = 'hsl(var(--primary-foreground))';
+      mLangFr.style.background = 'hsl(var(--background))';
+      mLangFr.style.color = 'hsl(var(--foreground))';
+    } else {
+      mLangFr.style.background = 'hsl(var(--primary))';
+      mLangFr.style.color = 'hsl(var(--primary-foreground))';
+      mLangEn.style.background = 'hsl(var(--background))';
+      mLangEn.style.color = 'hsl(var(--foreground))';
+    }
+  }
+  updateMobileLangButtons();
+
+  mLangEn.addEventListener('click', function() {
+    uiLang = 'en';
+    window.__taLang = 'en';
+    localStorage.setItem('ta_lang', 'en');
+    updateMobileLangButtons();
+    updateLabels();
+    updateMobileLoginState();
+  });
+  mLangFr.addEventListener('click', function() {
+    uiLang = 'fr';
+    window.__taLang = 'fr';
+    localStorage.setItem('ta_lang', 'fr');
+    updateMobileLangButtons();
+    updateLabels();
+    updateMobileLoginState();
   });
 
   // ── Share / Copy handlers ──
