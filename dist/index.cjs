@@ -1141,7 +1141,7 @@ var _stopFR = new Set('a ai aie ainsi ait allaient allons alors au aucun aucune 
 async function termiumSearch(words, direction) {
   var srcLang = direction === 'fr-en' ? 'fra' : 'eng';
   var results = [];
-  for (var w of words.slice(0, 4)) {
+  for (var w of words.slice(0, 12)) {
     try {
       var url = 'https://www.btb.termiumplus.gc.ca/tpv2alpha/alpha-' + srcLang + '.html?lang=' + srcLang + '&i=1&srchtxt=' + encodeURIComponent(w) + '&codom2nd_wet=1&index=alt&wbdisable=true';
       var resp = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: AbortSignal.timeout(8000) });
@@ -1168,7 +1168,7 @@ async function lingueeSearch(words, direction) {
   var src = direction === 'fr-en' ? 'fr' : 'en';
   var dst = direction === 'fr-en' ? 'en' : 'fr';
   var results = [];
-  for (var w of words.slice(0, 6)) {
+  for (var w of words.slice(0, 10)) {
     try {
       var resp = await fetch('https://linguee-api.fly.dev/api/v2/translations?query=' + encodeURIComponent(w) + '&src=' + src + '&dst=' + dst);
       if (!resp.ok) continue;
@@ -1193,8 +1193,9 @@ async function lingueeSearch(words, direction) {
 }
 
 async function webTermSearch(plainText, glossaryMatches, cfg, direction) {
+  var _allFound = []; // accumulate across steps for error recovery
   try {
-    console.log("webTermSearch called: providerType=" + cfg.providerType + " model=" + cfg.model);
+    console.log("webTermSearch called (4-step pipeline): providerType=" + cfg.providerType + " model=" + cfg.model);
 
     // Build list of terms already in glossary to exclude
     var knownTerms = new Set(glossaryMatches.map(g => g.source.toLowerCase()));
@@ -1209,158 +1210,85 @@ async function webTermSearch(plainText, glossaryMatches, cfg, direction) {
     // Deduplicate and take unique words
     var seenWords = {};
     var uniqueWords = plainWords.filter(function(w) { var lw = w.toLowerCase(); if (seenWords[lw]) return false; seenWords[lw] = true; return true; });
-    console.log('Terminology extraction: ' + uniqueWords.length + ' content words after stop word filter');
-    // Step 1a: Search TERMIUM Plus (real Government of Canada database)
+    console.log('Pre-filter: ' + uniqueWords.length + ' content words after stop word filter');
+
+    // ══════ STEP 1: LLM identifies terminology-worthy terms ══════
+    var _isFrToEn = (direction === 'fr-en');
+    var _srcLabel = _isFrToEn ? 'French' : 'English';
+    var _tgtLabel = _isFrToEn ? 'English' : 'Canadian French';
+    var _identifyPrompt = 'You are a terminology extraction specialist. From the following ' + _srcLabel + ' text, identify ALL terms worth looking up in a terminology database (TERMIUM Plus, Grand dictionnaire terminologique). Include:\n' +
+      '- Technical, scientific, legal, administrative, or industry-specific terms\n' +
+      '- Institutional names, titles, proper nouns, program names\n' +
+      '- Multi-word expressions with specialized meaning\n' +
+      '- Domain-specific vocabulary that a general bilingual dictionary might not cover well\n\n' +
+      'DO NOT include everyday words, common verbs, adjectives, or basic vocabulary.\n\n' +
+      'EXCLUDE these terms (already in glossary): ' + (Array.from(knownTerms).join(', ') || '(none)') + '\n\n' +
+      'Return ONLY a JSON array of strings, e.g.: ["term1", "term2", "multi-word term"]. Return [] if no specialized terms found.\n\n' +
+      'Text:\n' + plainText.replace(/<[^>]*>/g, ' ').substring(0, 3000);
+
+    var llmTerms = [];
+    try {
+      var _identifyResp = await rx(_identifyPrompt, 'Extract terminology now.', {...cfg, temperature: 0.1});
+      var _jsonMatch = _identifyResp.match(/\[\s*[\s\S]*?\]/);
+      if (_jsonMatch) llmTerms = JSON.parse(_jsonMatch[0]);
+      // Also include the stop-word-filtered unique words the LLM might have missed
+      var llmSet = new Set(llmTerms.map(function(t) { return t.toLowerCase(); }));
+      uniqueWords.forEach(function(w) { if (!llmSet.has(w.toLowerCase()) && w.length > 4) llmTerms.push(w); });
+      console.log('Step 1 (LLM identify): ' + llmTerms.length + ' terms to look up');
+    } catch(e) {
+      console.warn('Step 1 error:', e.message, '- falling back to word filter');
+      llmTerms = uniqueWords;
+    }
+    if (llmTerms.length === 0) return [];
+
+    // ══════ STEP 2: Search TERMIUM Plus + Linguee (real databases) ══════
     var termiumResults = [];
     try {
-      termiumResults = await termiumSearch(uniqueWords, direction);
-      console.log('TERMIUM Plus found ' + termiumResults.length + ' terms');
-    } catch(te) { console.warn('TERMIUM lookup error:', te.message); }
+      termiumResults = await termiumSearch(llmTerms.slice(0, 10), direction);
+      console.log('Step 2a (TERMIUM): ' + termiumResults.length + ' real results');
+    } catch(te) { console.warn('TERMIUM error:', te.message); }
+    _allFound = _allFound.concat(termiumResults);
 
-    // Step 1b: Search Linguee for words TERMIUM didn't cover
-    var termiumFoundWords = new Set(termiumResults.map(function(r) { return (direction === 'fr-en' ? r.fr : r.en || '').toLowerCase(); }));
-    var remainingWords = uniqueWords.filter(function(w) { return !termiumFoundWords.has(w.toLowerCase()); });
+    var termiumFoundWords = new Set(termiumResults.map(function(r) { return (_isFrToEn ? r.fr : r.en || '').toLowerCase(); }));
+    var remainingTerms = llmTerms.filter(function(t) { return !termiumFoundWords.has(t.toLowerCase()); });
+
     var lingueeResults = [];
     try {
-      lingueeResults = await lingueeSearch(remainingWords, direction);
-      console.log('Linguee dictionary found ' + lingueeResults.length + ' translations');
-    } catch(le) { console.warn('Linguee lookup error:', le.message); }
+      lingueeResults = await lingueeSearch(remainingTerms.slice(0, 8), direction);
+      console.log('Step 2b (Linguee): ' + lingueeResults.length + ' real results');
+    } catch(le) { console.warn('Linguee error:', le.message); }
+    _allFound = _allFound.concat(lingueeResults);
 
-    // Merge: TERMIUM first (authoritative), then Linguee (common dictionary)
-    var allResults = termiumResults.concat(lingueeResults);
-    console.log('Terminology search total: ' + termiumResults.length + ' TERMIUM + ' + lingueeResults.length + ' Linguee = ' + allResults.length);
-    return allResults.slice(0, 8);
+    var allRaw = termiumResults.concat(lingueeResults);
+    if (allRaw.length === 0) return [];
 
-    // --- OpenRouter web search (DISABLED: produces hallucinated sources) ---
-    var _OR_DISABLED = true; if (_OR_DISABLED) return lingueeResults;
-    var orEndpoint = "https://openrouter.ai/api/v1/chat/completions";
-    var orKey = cfg.apiKey;
-    var orModel = cfg.model;
-    // Determine the right key and model for OpenRouter web search
-    if (cfg.providerType === "openrouter") {
-      // Already using OpenRouter - use same key, ensure model has provider prefix
-      orKey = cfg.apiKey;
-      orModel = cfg.model.includes("/") ? cfg.model : "anthropic/" + cfg.model;
-      console.log("Web term search: using OpenRouter main key, model=" + orModel);
-    } else if (cfg.providerType === "openai-compatible" && cfg.endpoint && cfg.endpoint.includes("openrouter")) {
-      // OpenAI-compatible pointing at OpenRouter
-      orKey = cfg.apiKey;
-      orModel = cfg.model.includes("/") ? cfg.model : "anthropic/" + cfg.model;
-    } else if (cfg.openrouterKey) {
-      // Anthropic direct or other, but has a separate OpenRouter key
-      orKey = cfg.openrouterKey;
-      orModel = "anthropic/claude-sonnet-4-6-20260205";
-    } else {
-      console.log("OpenRouter web search skipped (no key). Returning Linguee results only.");
-      return lingueeResults;
-    }
-    var _isFrToEn = (direction === "fr-en");
-    var prompt = _isFrToEn ? `You are a Canadian bilingual terminology specialist. Your task is STRICTLY limited to identifying DOMAIN-SPECIFIC TERMINOLOGY in the following French text.
+    // ══════ STEP 3: LLM sorts and validates results ══════
+    var _sortPrompt = 'You are a bilingual terminology reviewer. Below are terminology suggestions found in real databases (TERMIUM Plus and Linguee) for a ' + _srcLabel + ' to ' + _tgtLabel + ' translation.\n\n' +
+      'Your task:\n' +
+      '1. Remove any results that are trivial or unhelpful for translation (common words any translator knows)\n' +
+      '2. Remove duplicates\n' +
+      '3. Keep results that would genuinely help a translator: specialized terms, institutional vocabulary, terms with non-obvious translations\n' +
+      '4. Preserve the exact source attribution (TERMIUM Plus or Linguee) - do NOT change it\n\n' +
+      'Raw results:\n' + JSON.stringify(allRaw) + '\n\n' +
+      'Return ONLY a filtered JSON array in the same format. Return [] if none are useful.';
 
-ONLY include terms that belong to one of these categories:
-- Technical or scientific terms (e.g., "photovoltaïque", "biodiversité", "jurisprudence")
-- Institutional names, titles, or proper nouns (e.g., "Chambre des communes", "Loi sur les espèces en péril")
-- Industry jargon or specialized vocabulary unlikely to appear in a standard dictionary (e.g., "gouvernance", "sous-traitance", "amortissement")
-- Multi-word expressions with a fixed translation (e.g., "mise en œuvre", "parties prenantes")
+    try {
+      var _sortResp = await rx(_sortPrompt, 'Filter and sort now.', {...cfg, temperature: 0.1});
+      var _sortMatch = _sortResp.match(/\[\s*[\s\S]*?\]/);
+      if (_sortMatch) {
+        var sorted = JSON.parse(_sortMatch[0]);
+        // Verify source attributions weren't fabricated
+        var validSources = new Set(['TERMIUM Plus', 'Linguee']);
+        sorted = sorted.filter(function(t) { return t.en && t.fr && validSources.has(t.source); });
+        console.log('Step 3 (LLM sort): ' + allRaw.length + ' raw -> ' + sorted.length + ' validated');
+        return sorted.slice(0, 12);
+      }
+    } catch(e) { console.warn('Step 3 error:', e.message, '- returning raw results'); }
 
-DO NOT include:
-- Everyday words that any bilingual person knows (chat, maison, manger, travailler, carrière, détermination, etc.)
-- Common verbs, adjectives, adverbs, or abstract nouns (poursuivre, important, rapidement, etc.)
-- Words found in any basic French-English dictionary
-
-Apply common sense: if a word would NOT require a terminology database to translate, leave it out.
-
-EXCLUDE these terms (already in glossary): ${Array.from(knownTerms).join(", ") || "(none)"}
-
-For terms that DO qualify, search these Canadian sources:
-1. TERMIUM Plus (termiumplus.gc.ca)
-2. Grand dictionnaire terminologique (GDT - gdt.oqlf.gouv.qc.ca)
-3. Official Canadian government publications (canada.ca, laws-lois.justice.gc.ca)
-4. IATE (EU terminology database) as fallback
-
-Return ONLY a JSON array, no other text:
-[{"fr": "French term", "en": "English translation", "source": "TERMIUM Plus / GDT / etc."}]
-
-Return [] if the text contains no specialized terminology. Most everyday texts will return [].
-
-Text to analyze:
-${plainText.substring(0, 2000)}` : `You are a Canadian bilingual terminology specialist. Your task is STRICTLY limited to identifying DOMAIN-SPECIFIC TERMINOLOGY in the following English text.
-
-ONLY include terms that belong to one of these categories:
-- Technical or scientific terms (e.g., "photovoltaic", "biodiversity", "jurisprudence")
-- Institutional names, titles, or proper nouns (e.g., "House of Commons", "Species at Risk Act")
-- Industry jargon or specialized vocabulary unlikely to appear in a standard dictionary (e.g., "governance", "outsourcing", "amortization")
-- Multi-word expressions with a fixed translation (e.g., "stakeholders", "due diligence", "terms of reference")
-
-DO NOT include:
-- Everyday words that any bilingual person knows (cat, house, eat, work, career, determination, etc.)
-- Common verbs, adjectives, adverbs, or abstract nouns (pursue, important, quickly, etc.)
-- Words found in any basic English-French dictionary
-
-Apply common sense: if a word would NOT require a terminology database to translate, leave it out.
-
-EXCLUDE these terms (already in glossary): ${Array.from(knownTerms).join(", ") || "(none)"}
-
-For terms that DO qualify, search these Canadian sources:
-1. TERMIUM Plus (termiumplus.gc.ca)
-2. Grand dictionnaire terminologique (GDT - gdt.oqlf.gouv.qc.ca)
-3. Official Canadian government publications (canada.ca, laws-lois.justice.gc.ca)
-4. IATE (EU terminology database) as fallback
-
-Return ONLY a JSON array, no other text:
-[{"en": "English term", "fr": "Canadian French translation", "source": "TERMIUM Plus / GDT / etc."}]
-
-Return [] if the text contains no specialized terminology. Most everyday texts will return [].
-
-Text to analyze:
-${plainText.substring(0, 2000)}`;
-
-    var body = {
-      model: orModel,
-      max_tokens: 1024,
-      temperature: 0.1,
-      messages: [{ role: "user", content: prompt }],
-      plugins: [{ id: "web", max_results: 5 }],
-      provider: { zdr: true, data_collection: "deny" }
-    };
-
-    var resp = await fetch(orEndpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "Bearer " + orKey
-      },
-      body: JSON.stringify(body)
-    });
-
-    if (!resp.ok) {
-      var errText = await resp.text();
-      console.warn("Web term search API error:", resp.status, errText.substring(0, 200));
-      return [];
-    }
-
-    var data = await resp.json();
-    var raw = data.choices?.[0]?.message?.content || "";
-    // Parse JSON from response
-    var jsonMatch = raw.match(/\[\s*\{[\s\S]*\}\s*\]/);
-    if (!jsonMatch) {
-      // Try to see if it's just "[]"
-      if (raw.trim() === "[]") return [];
-      console.warn("Web term search: could not parse JSON from response");
-      return [];
-    }
-    var terms = JSON.parse(jsonMatch[0]);
-    // Filter out terms already in glossary
-    terms = terms.filter(t => t.en && t.fr && !knownTerms.has(_isFrToEn ? t.fr.toLowerCase() : t.en.toLowerCase()));
-    // Merge: Linguee (real dictionary) first, then OpenRouter web results (for terms not already found)
-    var lingueeKeys = new Set(lingueeResults.map(r => (r.en || r.fr || '').toLowerCase()));
-    var orFiltered = terms.filter(t => !lingueeKeys.has((_isFrToEn ? t.fr : t.en || '').toLowerCase()));
-    var merged = lingueeResults.concat(orFiltered);
-    console.log("Web term search: " + lingueeResults.length + " from Linguee + " + orFiltered.length + " from OpenRouter = " + merged.length + " total");
-    return merged.slice(0, 8);
+    return allRaw.slice(0, 12);
   } catch (err) {
-    console.warn("Web term search error:", err.message);
-    return lingueeResults || [];
+    console.warn('Terminology search error:', err.message);
+    return _allFound || [];
   }
 }
 
