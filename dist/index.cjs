@@ -2213,7 +2213,7 @@ setTimeout(function _setupMultiTenant() {
 
           var userPrompt = 'Translate the following ' + srcLang + ' text into ' + tgtLang + '. Return ONLY the translation, no explanations or notes.\n\n' + text;
           var translated = await _mtCallLLM(system, userPrompt, llmCfg, llmCfg.translateTemperature || 0.3);
-          res.json({ translated: translated, glossaryMatches: glossaryMatches, tmMatches: tmMatches, webTermSuggestions: webTermSuggestions });
+          res.json({ translation: translated, glossaryMatches: glossaryMatches, tmMatches: tmMatches, webTermSuggestions: webTermSuggestions, localTMEnabled: true });
         } catch(e) {
           console.error('Tenant ' + tenantId + ' translate error:', e.message);
           res.status(500).json({ error: e.message });
@@ -2510,7 +2510,9 @@ setTimeout(function _setupMultiTenant() {
         '/api/user/cancel-subscription',
         '/api/user/verify-email',
         '/api/user/resend-verification',
-        '/api/user/change-password'
+        '/api/user/change-password',
+        '/api/freemium-config',
+        '/api/stripe/webhook'
       ];
       _userPassthroughPaths.forEach(function(p) {
         router.all(p, function(req, res) {
