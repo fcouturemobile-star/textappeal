@@ -2455,6 +2455,61 @@ setTimeout(function _setupMultiTenant() {
         res.json({ ok: true, enableLocalTM: tenantCfg.enableLocalTM });
       });
 
+      // ── Shared admin endpoints (proxy to main app) ──
+      // Stripe, DB, SMTP, Members, Usage — these are shared infrastructure, not tenant-specific.
+      // We forward these to the main app's handlers by rewriting the URL.
+      var _sharedAdminPaths = [
+        '/api/admin/stripe-config',
+        '/api/admin/db-config',
+        '/api/admin/db-init',
+        '/api/admin/smtp-config',
+        '/api/admin/smtp-test',
+        '/api/admin/members',
+        '/api/admin/usage-stats',
+        '/api/admin/credentials',
+        '/api/admin/models',
+        '/api/admin/web-search-key',
+        '/api/admin/bedrock-test'
+      ];
+      _sharedAdminPaths.forEach(function(sharedPath) {
+        router.all(sharedPath, function(req, res) {
+          // Forward to main app by calling the main handler directly
+          // Save original URL, rewrite to remove tenant prefix, call main app, restore
+          var origUrl = req.url;
+          var origBaseUrl = req.baseUrl;
+          req.url = sharedPath;
+          req.baseUrl = '';
+          ma.handle(req, res, function() {
+            req.url = origUrl;
+            req.baseUrl = origBaseUrl;
+            res.status(404).json({ error: 'Not found' });
+          });
+        });
+      });
+      // Members sub-routes (PUT, DELETE with :id)
+      router.all('/api/admin/members/:id/*splat', function(req, res) {
+        var origUrl = req.url;
+        var origBaseUrl = req.baseUrl;
+        req.url = '/api/admin/members/' + req.params.id + '/' + req.params.splat;
+        req.baseUrl = '';
+        ma.handle(req, res, function() {
+          req.url = origUrl;
+          req.baseUrl = origBaseUrl;
+          res.status(404).json({ error: 'Not found' });
+        });
+      });
+      router.all('/api/admin/members/:id', function(req, res) {
+        var origUrl = req.url;
+        var origBaseUrl = req.baseUrl;
+        req.url = '/api/admin/members/' + req.params.id;
+        req.baseUrl = '';
+        ma.handle(req, res, function() {
+          req.url = origUrl;
+          req.baseUrl = origBaseUrl;
+          res.status(404).json({ error: 'Not found' });
+        });
+      });
+
       // ── SPA fallback for tenant — must be LAST for this tenant prefix ──
       router.get('/', function(req, res) { _mtServeTenantHtml(req, res, tenantId); });
       router.get('/*splat', function(req, res) { _mtServeTenantHtml(req, res, tenantId); });
