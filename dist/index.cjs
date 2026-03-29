@@ -2031,32 +2031,45 @@ setTimeout(function _setupMultiTenant() {
   }
 
   // ── Glossary matching ──────────────────────────────────────────────────
-  function _mtMatchGlossary(text, tenantId) {
+  function _mtMatchGlossary(text, tenantId, direction) {
     var glossary = _mtTenantData[tenantId] ? _mtTenantData[tenantId].glossary : [];
     var lower = text.toLowerCase();
+    var isFrToEn = direction === 'fr-en';
     var matches = [];
     var ranges = [];
     for (var i = 0; i < glossary.length; i++) {
       var entry = glossary[i];
-      var idx = lower.indexOf(entry.sourceLower);
+      // For FR→EN, search the French column (target); for EN→FR, search the English column (source)
+      var searchTerm = isFrToEn ? (entry.target || '').toLowerCase() : entry.sourceLower;
+      if (!searchTerm) continue;
+      var idx = lower.indexOf(searchTerm);
       if (idx !== -1) {
-        var end = idx + entry.sourceLower.length;
+        var end = idx + searchTerm.length;
         var skip = false;
         for (var j = 0; j < ranges.length; j++) {
           if (idx >= ranges[j][0] && idx < ranges[j][1]) { skip = true; break; }
           if (end > ranges[j][0] && end <= ranges[j][1]) { skip = true; break; }
         }
-        if (!skip) { matches.push(entry); ranges.push([idx, end]); }
+        if (!skip) {
+          // Return source/target oriented to the translation direction
+          if (isFrToEn) {
+            matches.push({ source: entry.target, target: entry.source, sourceLower: searchTerm });
+          } else {
+            matches.push(entry);
+          }
+          ranges.push([idx, end]);
+        }
       }
     }
     return matches;
   }
 
   // ── TM fuzzy matching ──────────────────────────────────────────────────
-  function _mtMatchTM(text, tenantId, maxResults) {
+  function _mtMatchTM(text, tenantId, maxResults, direction) {
     if (!maxResults) maxResults = 5;
     var tm = _mtTenantData[tenantId] ? _mtTenantData[tenantId].tm : [];
     if (tm.length === 0) return [];
+    var isFrToEn = direction === 'fr-en';
     var words = [];
     var rawWords = text.toLowerCase().split(/\s+/);
     for (var i = 0; i < rawWords.length; i++) {
@@ -2066,8 +2079,10 @@ setTimeout(function _setupMultiTenant() {
     var scored = [];
     for (var k = 0; k < tm.length; k++) {
       var entry = tm[k];
+      // For FR→EN, match against the French side (target); for EN→FR, match against the English side (source)
+      var matchField = isFrToEn ? entry.target : entry.source;
       var eWords = [];
-      var rawEWords = entry.source.toLowerCase().split(/\s+/);
+      var rawEWords = matchField.toLowerCase().split(/\s+/);
       for (var j = 0; j < rawEWords.length; j++) {
         if (rawEWords[j].length > 2) eWords.push(rawEWords[j]);
       }
@@ -2078,13 +2093,19 @@ setTimeout(function _setupMultiTenant() {
           if (words[m] === eWords[n]) { overlap++; break; }
         }
       }
-      // Jaccard-like similarity
       var allWords = {};
       for (var p = 0; p < words.length; p++) allWords[words[p]] = 1;
       for (var q = 0; q < eWords.length; q++) allWords[eWords[q]] = 1;
       var unionSize = Object.keys(allWords).length;
       var sim = overlap / unionSize;
-      if (sim >= 0.3) scored.push({ source: entry.source, target: entry.target, similarity: Math.round(sim * 100) / 100 });
+      if (sim >= 0.3) {
+        // Return oriented to the translation direction
+        if (isFrToEn) {
+          scored.push({ source: entry.target, target: entry.source, similarity: Math.round(sim * 100) / 100 });
+        } else {
+          scored.push({ source: entry.source, target: entry.target, similarity: Math.round(sim * 100) / 100 });
+        }
+      }
     }
     scored.sort(function(a, b) { return b.similarity - a.similarity; });
     return scored.slice(0, maxResults);
@@ -2176,8 +2197,8 @@ setTimeout(function _setupMultiTenant() {
           if (!text) return res.status(400).json({ error: 'Missing text' });
           var llmCfg = _mtGetLLMConfig(tenantId);
           if (!llmCfg.apiKey) return res.status(500).json({ error: 'LLM not configured for tenant ' + tenantId + '. Please set up LLM in admin panel.' });
-          var glossaryMatches = _mtMatchGlossary(text, tenantId);
-          var tmMatches = _mtMatchTM(text, tenantId);
+          var glossaryMatches = _mtMatchGlossary(text, tenantId, direction);
+          var tmMatches = _mtMatchTM(text, tenantId, 5, direction);
           var context = _mtBuildContext(glossaryMatches, tmMatches);
           var srcLang = direction === 'en-fr' ? 'English' : 'French';
           var tgtLang = direction === 'en-fr' ? 'Canadian French' : 'English';
