@@ -2168,7 +2168,7 @@ setTimeout(function _setupMultiTenant() {
         });
       });
 
-      // ── Translate ──
+      // ── Translate (with 4-step web terminology pipeline) ──
       router.post('/api/translate', async function(req, res) {
         try {
           var text = req.body.text;
@@ -2181,10 +2181,39 @@ setTimeout(function _setupMultiTenant() {
           var context = _mtBuildContext(glossaryMatches, tmMatches);
           var srcLang = direction === 'en-fr' ? 'English' : 'French';
           var tgtLang = direction === 'en-fr' ? 'Canadian French' : 'English';
-          var system = 'You are a professional translator specializing in ' + srcLang + ' to ' + tgtLang + ' translation. Translate the text accurately while respecting the provided glossary and translation memory.\n\n' + context;
+
+          // 4-step web terminology search (TERMIUM Plus + Linguee) — same as main site
+          var webTermSuggestions = [];
+          try {
+            // webTermSearch is defined at module scope in the main app code
+            // It takes: (plainText, glossaryMatches, llmConfig, direction)
+            // We pass the tenant's LLM config so it uses the right API key
+            var _wtCfg = { providerType: llmCfg.providerType, endpoint: llmCfg.endpoint, apiKey: llmCfg.apiKey, model: llmCfg.model, temperature: 0.2 };
+            webTermSuggestions = await webTermSearch(text, glossaryMatches, _wtCfg, direction);
+            console.log('Tenant ' + tenantId + ' web terms: ' + webTermSuggestions.length + ' results');
+          } catch(_wte) {
+            console.warn('Tenant ' + tenantId + ' web term search:', _wte.message);
+          }
+
+          // Build translation prompt with all context
+          var system = 'You are a professional translator specializing in ' + srcLang + ' to ' + tgtLang + ' translation. Translate the text accurately while respecting the provided glossary, translation memory, and web terminology suggestions.\n\n' + context;
+
+          // Append web terminology suggestions if any
+          if (webTermSuggestions && webTermSuggestions.length > 0) {
+            var wtBlock = direction === 'fr-en'
+              ? '\n\nWeb terminology suggestions (use these specialized terms where applicable):\n'
+              : '\n\nSuggestions terminologiques Web (utilisez ces termes sp\u00e9cialis\u00e9s le cas \u00e9ch\u00e9ant) :\n';
+            webTermSuggestions.forEach(function(wt) {
+              var src = direction === 'fr-en' ? wt.fr : wt.en;
+              var tgt = direction === 'fr-en' ? wt.en : wt.fr;
+              wtBlock += ' - ' + (src || '?') + ' \u2192 ' + (tgt || '?') + (wt.source ? ' [' + wt.source + ']' : '') + '\n';
+            });
+            system = system + wtBlock;
+          }
+
           var userPrompt = 'Translate the following ' + srcLang + ' text into ' + tgtLang + '. Return ONLY the translation, no explanations or notes.\n\n' + text;
           var translated = await _mtCallLLM(system, userPrompt, llmCfg, llmCfg.translateTemperature || 0.3);
-          res.json({ translated: translated, glossaryMatches: glossaryMatches, tmMatches: tmMatches });
+          res.json({ translated: translated, glossaryMatches: glossaryMatches, tmMatches: tmMatches, webTermSuggestions: webTermSuggestions });
         } catch(e) {
           console.error('Tenant ' + tenantId + ' translate error:', e.message);
           res.status(500).json({ error: e.message });
