@@ -1837,3 +1837,635 @@ ma.post("/api/admin/temperatures", function(req, res) {
   pt();
   res.json({ ok: true, translateTemperature: cfg.translateTemperature, rewriteTemperature: cfg.rewriteTemperature });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// MULTI-TENANT SUB-SITES — Appended by tenant system
+// Tenants: CMN, FDX, MPC, CASW, CBS, DFC
+// Each gets its own TM, glossary, admin-config at /TENANT/* URLs
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── SYNCHRONOUS gateway: registered BEFORE the main app's /{*path} catch-all ──
+// This must run synchronously (not inside setTimeout) so it is in the Express
+// route stack before lx(ma) registers the SPA fallback.
+var _MT_TENANT_IDS = ['CMN', 'FDX', 'MPC', 'CASW', 'CBS', 'DFC'];
+var _MT_ROUTERS = {};  // populated in setTimeout below
+
+// Register one ma.use() per tenant — these intercept before the main catch-all.
+for (var _mti = 0; _mti < _MT_TENANT_IDS.length; _mti++) {
+  (function(_tenId) {
+    ma.use('/' + _tenId, function(req, res, next) {
+      var router = _MT_ROUTERS[_tenId];
+      if (router) {
+        // Rewrite req.url: strip the tenant prefix so the sub-router sees /api/stats etc.
+        var origUrl = req.url;
+        // req.url is already relative to the mount point in Express
+        router(req, res, next);
+      } else {
+        next();
+      }
+    });
+  })(_MT_TENANT_IDS[_mti]);
+}
+
+setTimeout(function _setupMultiTenant() {
+  var _mtFs = require("fs");
+  var _mtPath = require("path");
+  var _mtExpress = require("express");
+  var _mtCrypto = require("crypto");
+
+  var MT_TENANTS = ['CMN', 'FDX', 'MPC', 'CASW', 'CBS', 'DFC'];
+  var MT_HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
+  var MT_TENANTS_DIR = _mtPath.join(MT_HOME, '.textappeal', 'tenants');
+  var MT_PUBLIC_DIR = _mtPath.resolve(__dirname, 'public');
+
+  // ── Ensure tenant data directories exist ──────────────────────────────
+  var DUMMY_TMX = '<?xml version="1.0" encoding="UTF-8"?>\n<!DOCTYPE tmx SYSTEM "tmx14.dtd">\n<tmx version="1.4">\n  <header creationtool="TextAppeal" creationtoolversion="2.0" segtype="sentence" o-tmf="TMX" adminlang="en" srclang="en" datatype="plaintext"/>\n  <body>\n    <tu>\n      <tuv xml:lang="en"><seg>Cat</seg></tuv>\n      <tuv xml:lang="fr"><seg>Chat</seg></tuv>\n    </tu>\n  </body>\n</tmx>';
+
+  for (var _ti = 0; _ti < MT_TENANTS.length; _ti++) {
+    var _t = MT_TENANTS[_ti];
+    var _dir = _mtPath.join(MT_TENANTS_DIR, _t);
+    _mtFs.mkdirSync(_dir, { recursive: true });
+    if (!_mtFs.existsSync(_mtPath.join(_dir, 'memory.tmx')))
+      _mtFs.writeFileSync(_mtPath.join(_dir, 'memory.tmx'), DUMMY_TMX);
+    if (!_mtFs.existsSync(_mtPath.join(_dir, 'glossary.csv')))
+      _mtFs.writeFileSync(_mtPath.join(_dir, 'glossary.csv'), 'English,French\nCat,Chat\n');
+    if (!_mtFs.existsSync(_mtPath.join(_dir, 'admin-config.json'))) {
+      var _mainCfg = {};
+      try {
+        var _mp = _mtPath.join(MT_HOME, '.textappeal', 'admin-config.json');
+        if (_mtFs.existsSync(_mp)) _mainCfg = JSON.parse(_mtFs.readFileSync(_mp, 'utf8'));
+      } catch(e) {}
+      _mtFs.writeFileSync(_mtPath.join(_dir, 'admin-config.json'), JSON.stringify({
+        siteLinkMode: 'email', enableLocalTM: true,
+        llm: _mainCfg.llm || {}
+      }, null, 2));
+    }
+  }
+
+  // ── Per-tenant in-memory data ──────────────────────────────────────────
+  var _mtTenantData = {};
+
+  function _mtLoadTMX(tenantId) {
+    var tmxPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'memory.tmx');
+    if (!_mtFs.existsSync(tmxPath)) return [];
+    try {
+      var xml = _mtFs.readFileSync(tmxPath, 'utf8');
+      // Simple TMX parser without fast-xml-parser dependency issue
+      var entries = [];
+      var tuRegex = /<tu\b[^>]*>([\s\S]*?)<\/tu>/g;
+      var tuvRegex = /<tuv[^>]+xml:lang="([^"]+)"[^>]*>[\s\S]*?<seg>([\s\S]*?)<\/seg>/g;
+      var tuMatch;
+      while ((tuMatch = tuRegex.exec(xml)) !== null) {
+        var tuContent = tuMatch[1];
+        var en = '', fr = '';
+        var tuvMatch;
+        tuvRegex.lastIndex = 0;
+        while ((tuvMatch = tuvRegex.exec(tuContent)) !== null) {
+          var lang = tuvMatch[1].toLowerCase();
+          var seg = tuvMatch[2].trim();
+          if (lang.startsWith('en')) en = seg;
+          else if (lang.startsWith('fr')) fr = seg;
+        }
+        if (en && fr) entries.push({ source: en, target: fr });
+      }
+      return entries;
+    } catch(e) {
+      console.warn('Tenant ' + tenantId + ' TMX error:', e.message);
+      return [];
+    }
+  }
+
+  function _mtLoadGlossary(tenantId) {
+    var csvPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'glossary.csv');
+    if (!_mtFs.existsSync(csvPath)) return [];
+    try {
+      var csv = _mtFs.readFileSync(csvPath, 'utf8');
+      var lines = csv.split('\n');
+      var entries = [];
+      for (var i = 1; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line) continue;
+        var comma = line.indexOf(',');
+        if (comma === -1) continue;
+        var src = line.substring(0, comma).trim();
+        var tgt = line.substring(comma + 1).trim();
+        if (src && tgt) entries.push({ source: src, target: tgt, sourceLower: src.toLowerCase() });
+      }
+      entries.sort(function(a, b) { return b.source.length - a.source.length; });
+      return entries;
+    } catch(e) {
+      console.warn('Tenant ' + tenantId + ' glossary error:', e.message);
+      return [];
+    }
+  }
+
+  function _mtLoadConfig(tenantId) {
+    var cfgPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'admin-config.json');
+    try {
+      if (_mtFs.existsSync(cfgPath)) return JSON.parse(_mtFs.readFileSync(cfgPath, 'utf8'));
+    } catch(e) {}
+    return {};
+  }
+
+  function _mtSaveConfig(tenantId, cfg) {
+    var cfgPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'admin-config.json');
+    _mtFs.mkdirSync(_mtPath.dirname(cfgPath), { recursive: true });
+    _mtFs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+  }
+
+  // Initialize all tenant data
+  for (var _i2 = 0; _i2 < MT_TENANTS.length; _i2++) {
+    var _tid = MT_TENANTS[_i2];
+    _mtTenantData[_tid] = {
+      tm: _mtLoadTMX(_tid),
+      glossary: _mtLoadGlossary(_tid),
+      config: _mtLoadConfig(_tid)
+    };
+    console.log('Tenant ' + _tid + ': ' + _mtTenantData[_tid].tm.length + ' TM entries, ' + _mtTenantData[_tid].glossary.length + ' glossary entries');
+  }
+
+  // ── LLM config resolution ──────────────────────────────────────────────
+  function _mtGetLLMConfig(tenantId) {
+    var tc = _mtTenantData[tenantId] ? _mtTenantData[tenantId].config : {};
+    // Tenant-specific LLM config takes priority
+    var tcLlm = tc.llm || {};
+    if (tcLlm.apiKey && tcLlm.endpoint && tcLlm.model) return tcLlm;
+    // Fall back to main app's LLM config via Ga()
+    try {
+      var mainCfg = Ga();
+      var mainLlm = mainCfg.llm || {};
+      return {
+        providerType: tcLlm.providerType || mainLlm.providerType || 'anthropic',
+        endpoint: tcLlm.endpoint || mainLlm.endpoint || 'https://api.anthropic.com/v1/messages',
+        apiKey: tcLlm.apiKey || mainLlm.apiKey || '',
+        model: tcLlm.model || mainLlm.model || 'claude-sonnet-4-6-20260205',
+        temperature: typeof tcLlm.temperature === 'number' ? tcLlm.temperature : (mainLlm.temperature || 0.3),
+        translateTemperature: tc.translateTemperature || mainCfg.translateTemperature || 0.3,
+        rewriteTemperature: tc.rewriteTemperature || mainCfg.rewriteTemperature || 0.7
+      };
+    } catch(e) { return tcLlm; }
+  }
+
+  // ── LLM call ──────────────────────────────────────────────────────────
+  async function _mtCallLLM(system, userMsg, llmCfg, temp) {
+    var t = (typeof temp === 'number') ? temp : (llmCfg.temperature || 0.3);
+    if (llmCfg.providerType === 'anthropic') {
+      var r = await fetch(llmCfg.endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': llmCfg.apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: llmCfg.model, max_tokens: 8192, temperature: t, system: system, messages: [{ role: 'user', content: userMsg }] })
+      });
+      if (!r.ok) { var errText = await r.text(); throw new Error('LLM error ' + r.status + ': ' + errText); }
+      var data = await r.json();
+      return data.content && data.content[0] ? data.content[0].text : '';
+    } else {
+      var r2 = await fetch(llmCfg.endpoint, {
+        method: 'POST',
+        headers: Object.assign({ 'Content-Type': 'application/json' }, llmCfg.apiKey ? { Authorization: 'Bearer ' + llmCfg.apiKey } : {}),
+        body: JSON.stringify({ model: llmCfg.model, max_tokens: 8192, temperature: t, messages: [{ role: 'system', content: system }, { role: 'user', content: userMsg }], provider: { zdr: true, data_collection: 'deny' } })
+      });
+      if (!r2.ok) { var errText2 = await r2.text(); throw new Error('LLM error ' + r2.status + ': ' + errText2); }
+      var data2 = await r2.json();
+      return data2.choices && data2.choices[0] ? data2.choices[0].message.content : '';
+    }
+  }
+
+  // ── Glossary matching ──────────────────────────────────────────────────
+  function _mtMatchGlossary(text, tenantId) {
+    var glossary = _mtTenantData[tenantId] ? _mtTenantData[tenantId].glossary : [];
+    var lower = text.toLowerCase();
+    var matches = [];
+    var ranges = [];
+    for (var i = 0; i < glossary.length; i++) {
+      var entry = glossary[i];
+      var idx = lower.indexOf(entry.sourceLower);
+      if (idx !== -1) {
+        var end = idx + entry.sourceLower.length;
+        var skip = false;
+        for (var j = 0; j < ranges.length; j++) {
+          if (idx >= ranges[j][0] && idx < ranges[j][1]) { skip = true; break; }
+          if (end > ranges[j][0] && end <= ranges[j][1]) { skip = true; break; }
+        }
+        if (!skip) { matches.push(entry); ranges.push([idx, end]); }
+      }
+    }
+    return matches;
+  }
+
+  // ── TM fuzzy matching ──────────────────────────────────────────────────
+  function _mtMatchTM(text, tenantId, maxResults) {
+    if (!maxResults) maxResults = 5;
+    var tm = _mtTenantData[tenantId] ? _mtTenantData[tenantId].tm : [];
+    if (tm.length === 0) return [];
+    var words = [];
+    var rawWords = text.toLowerCase().split(/\s+/);
+    for (var i = 0; i < rawWords.length; i++) {
+      if (rawWords[i].length > 2) words.push(rawWords[i]);
+    }
+    if (words.length === 0) return [];
+    var scored = [];
+    for (var k = 0; k < tm.length; k++) {
+      var entry = tm[k];
+      var eWords = [];
+      var rawEWords = entry.source.toLowerCase().split(/\s+/);
+      for (var j = 0; j < rawEWords.length; j++) {
+        if (rawEWords[j].length > 2) eWords.push(rawEWords[j]);
+      }
+      if (eWords.length === 0) continue;
+      var overlap = 0;
+      for (var m = 0; m < words.length; m++) {
+        for (var n = 0; n < eWords.length; n++) {
+          if (words[m] === eWords[n]) { overlap++; break; }
+        }
+      }
+      // Jaccard-like similarity
+      var allWords = {};
+      for (var p = 0; p < words.length; p++) allWords[words[p]] = 1;
+      for (var q = 0; q < eWords.length; q++) allWords[eWords[q]] = 1;
+      var unionSize = Object.keys(allWords).length;
+      var sim = overlap / unionSize;
+      if (sim >= 0.3) scored.push({ source: entry.source, target: entry.target, similarity: Math.round(sim * 100) / 100 });
+    }
+    scored.sort(function(a, b) { return b.similarity - a.similarity; });
+    return scored.slice(0, maxResults);
+  }
+
+  // ── Build glossary/TM context for LLM prompt ──────────────────────────
+  function _mtBuildContext(glossaryMatches, tmMatches) {
+    var ctx = '';
+    if (glossaryMatches.length > 0) {
+      ctx += '## MANDATORY GLOSSARY — USE THESE EXACT TRANSLATIONS (NON-NEGOTIABLE):\n\n';
+      for (var i = 0; i < glossaryMatches.length; i++) {
+        ctx += '\u2022 "' + glossaryMatches[i].source + '" \u2192 "' + glossaryMatches[i].target + '"\n';
+      }
+      ctx += '\n';
+    }
+    if (tmMatches.length > 0) {
+      ctx += '## Translation Memory Matches (use as reference for style and terminology):\n\n';
+      for (var j = 0; j < tmMatches.length; j++) {
+        ctx += 'EN: ' + tmMatches[j].source + '\nFR: ' + tmMatches[j].target + '\n(Similarity: ' + Math.round(tmMatches[j].similarity * 100) + '%)\n\n';
+      }
+    }
+    return ctx;
+  }
+
+  // ── Admin token store for tenant admins ───────────────────────────────
+  var _mtAdminTokens = new Map();
+
+  function _mtCheckToken(req, tenantId) {
+    var token = req.headers['x-admin-token'];
+    if (!token) return false;
+    // Allow tokens from the shared main lt map too (same master admin)
+    if (lt.has(token)) return true;
+    if (_mtAdminTokens.has(token)) {
+      var info = _mtAdminTokens.get(token);
+      if (Date.now() > info.expiresAt) { _mtAdminTokens.delete(token); return false; }
+      return info.tenant === tenantId;
+    }
+    return false;
+  }
+
+  // ── Read index.html once ───────────────────────────────────────────────
+  var _mtIndexHtml = '';
+  try {
+    _mtIndexHtml = _mtFs.readFileSync(_mtPath.join(MT_PUBLIC_DIR, 'index.html'), 'utf8');
+  } catch(e) {
+    console.error('Multi-tenant: Could not read index.html:', e.message);
+  }
+
+  function _mtServeTenantHtml(req, res, tenantId) {
+    if (!_mtIndexHtml) return res.status(500).send('Could not load app');
+    // Inject: base href + tenant context script
+    // Place it right after <head> tag
+    var injection = '<base href="/' + tenantId + '/"><script>window.__tenant="' + tenantId + '";window.__tenantApiPrefix="/' + tenantId + '";</script>';
+    var html = _mtIndexHtml.replace('<head>', '<head>' + injection);
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    res.send(html);
+  }
+
+  // ── Register routes for each tenant ──────────────────────────────────
+  for (var _ti2 = 0; _ti2 < MT_TENANTS.length; _ti2++) {
+    (function(tenantId) {
+      // ── Create a dedicated Express Router for this tenant ──
+      // Routes use paths WITHOUT the tenant prefix (e.g. '/api/stats' not '/CMN/api/stats')
+      // because the synchronous gateway already strips the prefix via ma.use('/CMN', ...).
+      var router = _mtExpress.Router();
+      _MT_ROUTERS[tenantId] = router;  // wire up the synchronous gateway
+
+      // ── Static assets (same public dir, served before API routes) ──
+      router.use(_mtExpress.static(MT_PUBLIC_DIR, { index: false }));
+
+      // ── Stats ──
+      router.get('/api/stats', function(req, res) {
+        var cfg = _mtGetLLMConfig(tenantId);
+        var data = _mtTenantData[tenantId] || {};
+        res.json({
+          tmEntries: (data.tm || []).length,
+          glossaryEntries: (data.glossary || []).length,
+          llmProvider: cfg.providerType || 'unknown',
+          llmModel: cfg.model || 'unknown',
+          status: cfg.apiKey ? 'ready' : 'unconfigured'
+        });
+      });
+
+      // ── Translate ──
+      router.post('/api/translate', async function(req, res) {
+        try {
+          var text = req.body.text;
+          var direction = req.body.direction || 'en-fr';
+          if (!text) return res.status(400).json({ error: 'Missing text' });
+          var llmCfg = _mtGetLLMConfig(tenantId);
+          if (!llmCfg.apiKey) return res.status(500).json({ error: 'LLM not configured for tenant ' + tenantId + '. Please set up LLM in admin panel.' });
+          var glossaryMatches = _mtMatchGlossary(text, tenantId);
+          var tmMatches = _mtMatchTM(text, tenantId);
+          var context = _mtBuildContext(glossaryMatches, tmMatches);
+          var srcLang = direction === 'en-fr' ? 'English' : 'French';
+          var tgtLang = direction === 'en-fr' ? 'Canadian French' : 'English';
+          var system = 'You are a professional translator specializing in ' + srcLang + ' to ' + tgtLang + ' translation. Translate the text accurately while respecting the provided glossary and translation memory.\n\n' + context;
+          var userPrompt = 'Translate the following ' + srcLang + ' text into ' + tgtLang + '. Return ONLY the translation, no explanations or notes.\n\n' + text;
+          var translated = await _mtCallLLM(system, userPrompt, llmCfg, llmCfg.translateTemperature || 0.3);
+          res.json({ translated: translated, glossaryMatches: glossaryMatches, tmMatches: tmMatches });
+        } catch(e) {
+          console.error('Tenant ' + tenantId + ' translate error:', e.message);
+          res.status(500).json({ error: e.message });
+        }
+      });
+
+      // ── Rewrite ──
+      router.post('/api/rewrite', async function(req, res) {
+        try {
+          var text = req.body.text;
+          var direction = req.body.direction || 'en-fr';
+          var style = req.body.style || 'textAppeal';
+          var appliedIds = req.body.appliedPrincipleIds || null;
+          if (!text) return res.status(400).json({ error: 'Missing text' });
+          var llmCfg = _mtGetLLMConfig(tenantId);
+          if (!llmCfg.apiKey) return res.status(500).json({ error: 'LLM not configured for tenant ' + tenantId });
+          // Use same shared style prompts as main site
+          var prompts = direction === 'fr-en' ? _stylePromptsEN : _stylePrompts;
+          var key = (style === 'classicalFrench' || style === 'classicalEnglish')
+            ? (direction === 'fr-en' ? 'classicalEnglish' : 'classicalFrench') : style;
+          var stylePrompt = prompts[key] || prompts.textAppeal;
+          var system = stylePrompt + '\n\nIMPORTANT: Return a JSON object with two keys: "rewritten" (the polished text) and "appliedPrinciples" (array of principle numbers that were applied).';
+          var userPrompt = 'Please revise the following text:\n\n' + text;
+          var rewriteTemp = llmCfg.rewriteTemperature || 0.7;
+          var raw = await _mtCallLLM(system, userPrompt, llmCfg, rewriteTemp * 1.4);
+          var rewritten = raw, appliedPrinciples = [];
+          try {
+            var jsonStr = raw;
+            var jsonMatch = raw.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/);
+            if (jsonMatch) { jsonStr = jsonMatch[1]; }
+            else { var m2 = raw.match(/\{[\s\S]*"rewritten"[\s\S]*\}/); if (m2) jsonStr = m2[0]; }
+            var parsed = JSON.parse(jsonStr);
+            if (parsed.rewritten) { rewritten = parsed.rewritten; appliedPrinciples = parsed.appliedPrinciples || []; }
+          } catch(pe) { /* use raw */ }
+          res.json({ rewritten: rewritten, appliedPrinciples: appliedPrinciples });
+        } catch(e) {
+          console.error('Tenant ' + tenantId + ' rewrite error:', e.message);
+          res.status(500).json({ error: e.message });
+        }
+      });
+
+      // ── Principles ──
+      router.get('/api/principles', function(req, res) {
+        var dir = req.query.direction || 'en-fr';
+        var style = req.query.style || 'textAppeal';
+        var prompts = dir === 'fr-en' ? _stylePromptsEN : _stylePrompts;
+        var key = (style === 'classicalFrench' || style === 'classicalEnglish')
+          ? (dir === 'fr-en' ? 'classicalEnglish' : 'classicalFrench') : style;
+        var prompt = prompts[key] || prompts.textAppeal;
+        var re = dir === 'fr-en' ? /Principle (\d+)\s*:\s*([^\n]+)/g : /Principe (\d+)\s*:\s*([^\n]+)/g;
+        var result = [];
+        var m;
+        while ((m = re.exec(prompt)) !== null) {
+          result.push({ id: parseInt(m[1]), name: m[2].trim().replace(/\.$/, '') });
+        }
+        res.json(result);
+      });
+
+      // ── Style meta ──
+      router.get('/api/style-meta', function(req, res) {
+        var meta = {};
+        for (var k in _stylePrompts) {
+          var matches = _stylePrompts[k].match(/Principe \d+ : [^\n]+/g);
+          meta[k] = { count: matches ? matches.length : 0 };
+        }
+        res.json(meta);
+      });
+
+      // ── Splash messages ──
+      router.get('/api/splash-messages', function(req, res) {
+        var splashPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'splash-messages.json');
+        if (_mtFs.existsSync(splashPath)) {
+          try { return res.json(JSON.parse(_mtFs.readFileSync(splashPath, 'utf8'))); } catch(e) {}
+        }
+        res.json(_splashMessages);
+      });
+
+      // ── Site link mode ──
+      router.get('/api/site-link-mode', function(req, res) {
+        var cfg = _mtTenantData[tenantId] ? _mtTenantData[tenantId].config : {};
+        res.json({ mode: cfg.siteLinkMode || 'email' });
+      });
+
+      // ── Admin: login ──
+      router.post('/api/admin/login', function(req, res) {
+        var username = req.body.username;
+        var password = req.body.password;
+        if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+        // Use same credentials as main admin (shared master admin)
+        if (!ex(username, password)) return res.status(401).json({ error: 'Invalid credentials' });
+        var token = _mtCrypto.randomBytes(32).toString('hex');
+        _mtAdminTokens.set(token, { username: username, tenant: tenantId, expiresAt: Date.now() + 1440 * 60 * 1000 });
+        // Also add to main lt so main admin endpoints recognize it
+        lt.set(token, { username: username, expiresAt: Date.now() + 1440 * 60 * 1000 });
+        res.json({ token: token });
+      });
+
+      // ── Admin: logout ──
+      router.post('/api/admin/logout', function(req, res) {
+        var token = req.headers['x-admin-token'];
+        if (token) { _mtAdminTokens.delete(token); lt.delete(token); }
+        res.json({ ok: true });
+      });
+
+      // ── Admin: check ──
+      router.get('/api/admin/check', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        res.json({ authenticated: true });
+      });
+
+      // ── Admin: get LLM config ──
+      router.get('/api/admin/llm', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var cfg = _mtGetLLMConfig(tenantId);
+        var masked = cfg.apiKey ? cfg.apiKey.substring(0, 12) + '...' + cfg.apiKey.substring(cfg.apiKey.length - 4) : '';
+        res.json(Object.assign({}, cfg, { apiKeyMasked: masked }));
+      });
+
+      // ── Admin: set LLM config ──
+      router.post('/api/admin/llm', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var body = req.body;
+        var tenantCfg = _mtTenantData[tenantId].config;
+        if (!tenantCfg.llm) tenantCfg.llm = {};
+        if (body.providerType) tenantCfg.llm.providerType = body.providerType;
+        if (body.endpoint) tenantCfg.llm.endpoint = body.endpoint;
+        if (body.apiKey && !body.apiKey.includes('...')) tenantCfg.llm.apiKey = body.apiKey;
+        if (body.model) tenantCfg.llm.model = body.model;
+        if (typeof body.temperature === 'number') tenantCfg.llm.temperature = body.temperature;
+        _mtTenantData[tenantId].config = tenantCfg;
+        _mtSaveConfig(tenantId, tenantCfg);
+        res.json({ ok: true, message: 'LLM configuration updated for ' + tenantId });
+      });
+
+      // ── Admin: temperatures ──
+      router.get('/api/admin/temperatures', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var cfg = _mtTenantData[tenantId] ? _mtTenantData[tenantId].config : {};
+        res.json({ translateTemperature: cfg.translateTemperature || 0.3, rewriteTemperature: cfg.rewriteTemperature || 0.7 });
+      });
+
+      router.post('/api/admin/temperatures', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var body = req.body;
+        var tenantCfg = _mtTenantData[tenantId].config;
+        if (typeof body.translateTemperature === 'number') tenantCfg.translateTemperature = Math.max(0, Math.min(1, body.translateTemperature));
+        if (typeof body.rewriteTemperature === 'number') tenantCfg.rewriteTemperature = Math.max(0, Math.min(1, body.rewriteTemperature));
+        _mtTenantData[tenantId].config = tenantCfg;
+        _mtSaveConfig(tenantId, tenantCfg);
+        res.json({ ok: true, translateTemperature: tenantCfg.translateTemperature, rewriteTemperature: tenantCfg.rewriteTemperature });
+      });
+
+      // ── Admin: glossary upload ──
+      router.post('/api/admin/upload/glossary', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var multer = require('multer');
+        var upload = multer({ dest: '/tmp' }).single('file');
+        upload(req, res, function(err) {
+          if (err) return res.status(400).json({ error: err.message });
+          if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+          var dest = _mtPath.join(MT_TENANTS_DIR, tenantId, 'glossary.csv');
+          _mtFs.copyFileSync(req.file.path, dest);
+          _mtFs.unlinkSync(req.file.path);
+          _mtTenantData[tenantId].glossary = _mtLoadGlossary(tenantId);
+          res.json({ ok: true, message: 'Glossary updated', entries: _mtTenantData[tenantId].glossary.length });
+        });
+      });
+
+      // ── Admin: TMX upload ──
+      router.post('/api/admin/upload/tmx', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var multer = require('multer');
+        var upload = multer({ dest: '/tmp' }).single('file');
+        upload(req, res, function(err) {
+          if (err) return res.status(400).json({ error: err.message });
+          if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+          var dest = _mtPath.join(MT_TENANTS_DIR, tenantId, 'memory.tmx');
+          _mtFs.copyFileSync(req.file.path, dest);
+          _mtFs.unlinkSync(req.file.path);
+          _mtTenantData[tenantId].tm = _mtLoadTMX(tenantId);
+          res.json({ ok: true, message: 'Translation Memory updated', entries: _mtTenantData[tenantId].tm.length });
+        });
+      });
+
+      // ── Admin: reload TM/glossary from disk ──
+      router.post('/api/admin/reload', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        _mtTenantData[tenantId].tm = _mtLoadTMX(tenantId);
+        _mtTenantData[tenantId].glossary = _mtLoadGlossary(tenantId);
+        _mtTenantData[tenantId].config = _mtLoadConfig(tenantId);
+        res.json({ ok: true, tmEntries: _mtTenantData[tenantId].tm.length, glossaryEntries: _mtTenantData[tenantId].glossary.length });
+      });
+
+      // ── Admin: style prompts (shared, read-only per tenant) ──
+      router.get('/api/admin/style-prompts', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var result = { fr: {}, en: {} };
+        for (var k in _stylePrompts) {
+          result.fr[k] = { key: k, label: k, prompt: _stylePrompts[k], principleCount: (_stylePrompts[k].match(/Principe \d+\s*:/g) || []).length };
+        }
+        for (var k2 in _stylePromptsEN) {
+          result.en[k2] = { key: k2, label: k2, prompt: _stylePromptsEN[k2], principleCount: (_stylePromptsEN[k2].match(/Principle \d+\s*:/g) || []).length };
+        }
+        res.json(result);
+      });
+
+      // ── Admin: site-link-mode ──
+      router.get('/api/admin/site-link-mode', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var cfg = _mtTenantData[tenantId] ? _mtTenantData[tenantId].config : {};
+        res.json({ mode: cfg.siteLinkMode || 'email' });
+      });
+
+      router.post('/api/admin/site-link-mode', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var mode = req.body.mode;
+        if (mode !== 'shop' && mode !== 'email') return res.status(400).json({ error: "Mode must be 'shop' or 'email'" });
+        var tenantCfg = _mtTenantData[tenantId].config;
+        tenantCfg.siteLinkMode = mode;
+        _mtTenantData[tenantId].config = tenantCfg;
+        _mtSaveConfig(tenantId, tenantCfg);
+        res.json({ ok: true, mode: mode });
+      });
+
+      // ── Admin: splash messages per tenant ──
+      router.get('/api/admin/splash-messages', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var splashPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'splash-messages.json');
+        if (_mtFs.existsSync(splashPath)) {
+          try { return res.json(JSON.parse(_mtFs.readFileSync(splashPath, 'utf8'))); } catch(e) {}
+        }
+        res.json(_splashMessages);
+      });
+
+      router.post('/api/admin/splash-messages', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var body = req.body;
+        if (!body || !body.lang) return res.status(400).json({ error: 'Missing lang' });
+        var splashPath = _mtPath.join(MT_TENANTS_DIR, tenantId, 'splash-messages.json');
+        var msgs = JSON.parse(JSON.stringify(_splashMessages));
+        if (_mtFs.existsSync(splashPath)) {
+          try { msgs = JSON.parse(_mtFs.readFileSync(splashPath, 'utf8')); } catch(e) {}
+        }
+        var lang = body.lang;
+        if (!msgs[lang]) msgs[lang] = {};
+        if (body.title !== undefined) msgs[lang].title = body.title;
+        if (body.p1 !== undefined) msgs[lang].p1 = body.p1;
+        if (body.p2 !== undefined) msgs[lang].p2 = body.p2;
+        if (body.p3 !== undefined) msgs[lang].p3 = body.p3;
+        if (body.btn !== undefined) msgs[lang].btn = body.btn;
+        _mtFs.writeFileSync(splashPath, JSON.stringify(msgs, null, 2));
+        res.json({ ok: true, message: 'Splash messages updated for ' + lang });
+      });
+
+      // ── Admin: local TM config ──
+      router.get('/api/admin/local-tm-config', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var cfg = _mtTenantData[tenantId] ? _mtTenantData[tenantId].config : {};
+        res.json({ enableLocalTM: cfg.enableLocalTM !== false });
+      });
+
+      router.post('/api/admin/local-tm-config', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var v = req.body.enableLocalTM;
+        var tenantCfg = _mtTenantData[tenantId].config;
+        tenantCfg.enableLocalTM = !!v;
+        _mtSaveConfig(tenantId, tenantCfg);
+        res.json({ ok: true, enableLocalTM: tenantCfg.enableLocalTM });
+      });
+
+      // ── SPA fallback for tenant — must be LAST for this tenant prefix ──
+      router.get('/', function(req, res) { _mtServeTenantHtml(req, res, tenantId); });
+      router.get('/*splat', function(req, res) { _mtServeTenantHtml(req, res, tenantId); });
+
+      console.log('  Registered: /' + tenantId + ' sub-site');
+    })(MT_TENANTS[_ti2]);
+  }
+
+  console.log('\u2550\u2550\u2550 Multi-tenant routes registered \u2550\u2550\u2550');
+  console.log('Tenant URLs:');
+  for (var _k = 0; _k < MT_TENANTS.length; _k++) {
+    console.log('  /' + MT_TENANTS[_k] + ' \u2192 ' + MT_TENANTS[_k] + ' sub-site (independent TM, glossary, admin-config)');
+  }
+}, 500);

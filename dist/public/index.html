@@ -13,6 +13,59 @@
             https://www.perplexity.ai/computer
     -->
     <meta name="generator" content="Perplexity Computer">
+    <!-- ═══ Multi-Tenant Detection & API Prefix Injection ═══
+         When accessed via /CMN, /FDX, /MPC, /CASW, /CBS, /DFC,
+         the server injects <base href="/TENANT/"> and window.__tenant before this.
+         This script intercepts fetch/XHR to prefix /api/* calls with the tenant path.
+    -->
+    <script>
+    (function() {
+      // Detect tenant from window.__tenant (injected by server for tenant URLs)
+      // or from current pathname
+      var TENANTS = ['CMN','FDX','MPC','CASW','CBS','DFC'];
+      var tenant = window.__tenant || null;
+      if (!tenant) {
+        var parts = window.location.pathname.split('/');
+        var first = parts[1] ? parts[1].toUpperCase() : '';
+        for (var i = 0; i < TENANTS.length; i++) {
+          if (TENANTS[i] === first) { tenant = TENANTS[i]; break; }
+        }
+      }
+
+      if (!tenant) return; // Main site — no patching needed
+
+      window.__tenant = tenant;
+      var prefix = '/' + tenant;
+      window.__tenantApiPrefix = prefix;
+
+      // ── Patch fetch to prefix /api/ calls ──────────────────────────
+      var _origFetch = window.fetch;
+      window.fetch = function(input, init) {
+        var url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+        if (typeof url === 'string' && url.startsWith('/') && !url.startsWith(prefix + '/') && !url.startsWith(prefix + '?')) {
+          // Only prefix /api/* and other relative paths, but NOT already-prefixed
+          url = prefix + url;
+          if (typeof input === 'string') {
+            input = url;
+          } else if (input instanceof Request) {
+            input = new Request(url, input);
+          }
+        }
+        return _origFetch.call(this, input, init);
+      };
+
+      // ── Patch XMLHttpRequest.open for legacy code ───────────────────
+      var _origXHROpen = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function(method, url, async, user, pass) {
+        if (typeof url === 'string' && url.startsWith('/') && !url.startsWith(prefix + '/')) {
+          url = prefix + url;
+        }
+        return _origXHROpen.call(this, method, url, async !== undefined ? async : true, user, pass);
+      };
+
+      console.log('[TextAppeal] Tenant mode: ' + tenant + ' — API calls prefixed with ' + prefix);
+    })();
+    </script>
     <meta name="author" content="Perplexity Computer">
     <meta property="og:see_also" content="https://www.perplexity.ai/computer">
     <link rel="author" href="https://www.perplexity.ai/computer">
