@@ -2455,6 +2455,74 @@ setTimeout(function _setupMultiTenant() {
         res.json({ ok: true, enableLocalTM: tenantCfg.enableLocalTM });
       });
 
+      // ── Tenant user registration (inject tenant context) ──
+      router.post('/api/user/register', function(req, res) {
+        req.body.tenant = tenantId;
+        req.url = '/api/user/register';
+        req.baseUrl = '';
+        ma.handle(req, res, function() { res.status(404).json({ error: 'Not found' }); });
+      });
+
+      // Tenant user login (pass through — freemium.cjs handles email_verified check)
+      router.post('/api/user/login', function(req, res) {
+        req.url = '/api/user/login';
+        req.baseUrl = '';
+        ma.handle(req, res, function() { res.status(404).json({ error: 'Not found' }); });
+      });
+
+      // Other user routes — proxy as-is
+      var _userPassthroughPaths = [
+        '/api/user/logout',
+        '/api/user/me',
+        '/api/user/subscribe',
+        '/api/user/subscription-status',
+        '/api/user/forgot-password',
+        '/api/user/reset-password',
+        '/api/user/cancel-subscription',
+        '/api/user/verify-email',
+        '/api/user/resend-verification',
+        '/api/user/change-password'
+      ];
+      _userPassthroughPaths.forEach(function(p) {
+        router.all(p, function(req, res) {
+          req.url = p;
+          req.baseUrl = '';
+          ma.handle(req, res, function() { res.status(404).json({ error: 'Not found' }); });
+        });
+      });
+
+      // ── Admin: tenant email domain (tenant-specific config) ──
+      router.get('/api/admin/tenant-email-domain', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var MT_HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
+        var cfgPath = _mtPath.join(MT_HOME, '.textappeal', 'tenants', tenantId, 'admin-config.json');
+        var cfg = {};
+        try { if (_mtFs.existsSync(cfgPath)) cfg = JSON.parse(_mtFs.readFileSync(cfgPath, 'utf8')); } catch(e) {}
+        res.json({ allowedEmailDomain: cfg.allowedEmailDomain || '' });
+      });
+
+      router.post('/api/admin/tenant-email-domain', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        var domain = (req.body.allowedEmailDomain || '').toLowerCase().trim();
+        var MT_HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
+        var cfgPath = _mtPath.join(MT_HOME, '.textappeal', 'tenants', tenantId, 'admin-config.json');
+        var cfg = {};
+        try { if (_mtFs.existsSync(cfgPath)) cfg = JSON.parse(_mtFs.readFileSync(cfgPath, 'utf8')); } catch(e) {}
+        cfg.allowedEmailDomain = domain;
+        _mtTenantData[tenantId].config = cfg;
+        _mtSaveConfig(tenantId, cfg);
+        res.json({ ok: true, allowedEmailDomain: domain });
+      });
+
+      // ── Admin: create member (proxy to main, inject tenant) ──
+      router.post('/api/admin/create-member', function(req, res) {
+        if (!_mtCheckToken(req, tenantId)) return res.status(401).json({ error: 'Unauthorized' });
+        req.body.tenant = tenantId;
+        req.url = '/api/admin/create-member';
+        req.baseUrl = '';
+        ma.handle(req, res, function() { res.status(404).json({ error: 'Not found' }); });
+      });
+
       // ── Shared admin endpoints (proxy to main app) ──
       // Stripe, DB, SMTP, Members, Usage — these are shared infrastructure, not tenant-specific.
       // We forward these to the main app's handlers by rewriting the URL.

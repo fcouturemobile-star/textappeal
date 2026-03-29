@@ -240,6 +240,35 @@ async function getPool() {
 
       await pool.query(`INSERT IGNORE INTO stripe_config (id, free_requests_per_month, monthly_price_cad) VALUES (1, 30, 20.00)`);
 
+      // ── Email verification columns (safe: try/catch per ALTER) ──
+      const alterStmts = [
+        "ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 1",
+        "ALTER TABLE users ADD COLUMN verification_token VARCHAR(128) DEFAULT NULL",
+        "ALTER TABLE users ADD COLUMN verification_expires BIGINT DEFAULT NULL",
+        "ALTER TABLE users ADD COLUMN tenant VARCHAR(20) DEFAULT NULL"
+      ];
+      for (const stmt of alterStmts) {
+        try { await pool.query(stmt); } catch(ae) { /* column already exists — ignore */ }
+      }
+
+      await pool.query(`CREATE TABLE IF NOT EXISTS email_verifications (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token VARCHAR(128) NOT NULL UNIQUE,
+        expires_at BIGINT NOT NULL,
+        used TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
+      await pool.query(`CREATE TABLE IF NOT EXISTS password_resets (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        token VARCHAR(128) NOT NULL UNIQUE,
+        expires_at BIGINT NOT NULL,
+        used TINYINT(1) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+
       console.log('Database tables verified/created');
     } catch (initErr) {
       console.error('Auto-init tables warning:', initErr.message);
@@ -268,6 +297,20 @@ function verifyPassword(password, stored) {
 
 function generateToken() {
   return crypto.randomBytes(48).toString('hex');
+}
+
+// ─── Tenant email domain helper ──────────────────────────────────────────
+function getTenantEmailDomain(tenantId) {
+  if (!tenantId) return null; // main site — no restriction
+  try {
+    const MT_HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
+    const cfgPath = path.join(MT_HOME, '.textappeal', 'tenants', tenantId, 'admin-config.json');
+    if (fs.existsSync(cfgPath)) {
+      const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8'));
+      return cfg.allowedEmailDomain || null;
+    }
+  } catch (e) { console.error('getTenantEmailDomain error:', e.message); }
+  return null;
 }
 
 // ─── Helper: get current month reset date ───────────────────────────
@@ -406,12 +449,24 @@ function registerFreemiumRoutes(app) {
 
   // ── User Registration ──
   app.post('/api/user/register', async (req, res) => {
-    const { email, password, displayName } = req.body;
+    const { email, password, displayName, tenant } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
     if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
 
     const db = await getPool();
     if (!db) return res.status(503).json({ error: 'Database not configured yet. The admin needs to set up the MySQL connection in the admin panel (Database tab) and click Init Tables.' });
+
+    // ── Tenant email domain validation ──
+    if (tenant) {
+      const allowedDomain = getTenantEmailDomain(tenant);
+      if (allowedDomain) {
+        const emailLower = email.toLowerCase().trim();
+        const domainLower = allowedDomain.toLowerCase().trim();
+        if (!emailLower.endsWith('@' + domainLower)) {
+          return res.status(400).json({ error: `Only @${domainLower} emails are allowed for this site` });
+        }
+      }
+    }
 
     try {
       // Check if email exists
@@ -421,12 +476,73 @@ function registerFreemiumRoutes(app) {
       const hash = hashPassword(password);
       const monthReset = getMonthResetDate();
 
-      const [result] = await db.query(
-        'INSERT INTO users (email, password_hash, display_name, plan, month_reset_date) VALUES (?, ?, ?, ?, ?)',
-        [email.toLowerCase().trim(), hash, displayName || '', 'free', monthReset]
-      );
+      // Tenant users: email_verified = 0; main site users: email_verified = 1
+      const emailVerified = tenant ? 0 : 1;
+      const tenantVal = tenant || null;
 
-      // Auto-login (invalidate any prior sessions for this user)
+      let result;
+      try {
+        [result] = await db.query(
+          'INSERT INTO users (email, password_hash, display_name, plan, month_reset_date, email_verified, tenant) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [email.toLowerCase().trim(), hash, displayName || '', 'free', monthReset, emailVerified, tenantVal]
+        );
+      } catch (colErr) {
+        // Fallback: columns may not exist yet on first run before migration
+        [result] = await db.query(
+          'INSERT INTO users (email, password_hash, display_name, plan, month_reset_date) VALUES (?, ?, ?, ?, ?)',
+          [email.toLowerCase().trim(), hash, displayName || '', 'free', monthReset]
+        );
+      }
+
+      if (tenant && emailVerified === 0) {
+        // Generate verification token
+        const verifyToken = crypto.randomBytes(32).toString('hex');
+        const expiresAt = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+        try {
+          await db.query('INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)', [result.insertId, verifyToken, expiresAt]);
+        } catch (evErr) {
+          // Table may not exist yet, try creating it
+          await db.query(`CREATE TABLE IF NOT EXISTS email_verifications (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            token VARCHAR(128) NOT NULL UNIQUE,
+            expires_at BIGINT NOT NULL,
+            used TINYINT(1) DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+          await db.query('INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)', [result.insertId, verifyToken, expiresAt]);
+        }
+
+        // Build verification link
+        const baseUrl = req.headers.origin || `${req.protocol}://${req.headers.host}`;
+        const verifyLink = `${baseUrl}/${tenant}/#/verify-email?token=${verifyToken}`;
+        console.log(`[Email Verification] User: ${email}, Link: ${verifyLink}`);
+
+        // Send verification email
+        await sendEmail(
+          email.toLowerCase().trim(),
+          'Please verify your email',
+          `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+            <h2 style="color:#1e40af;margin-bottom:16px">Verify Your Email</h2>
+            <p>Thank you for registering! Please click the button below to verify your email address.</p>
+            <p>This link expires in 24 hours.</p>
+            <p style="text-align:center;margin:32px 0">
+              <a href="${verifyLink}" style="background:#2563eb;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Verify Email</a>
+            </p>
+            <p style="font-size:13px;color:#666">If you did not register for this account, you can safely ignore this email.</p>
+            <p style="font-size:12px;color:#999;margin-top:24px">If the button doesn't work, copy and paste this link into your browser:<br>${verifyLink}</p>
+          </div>`
+        );
+
+        return res.json({
+          ok: true,
+          requiresVerification: true,
+          message: 'Registration successful! Please check your email to verify your account before logging in.'
+        });
+      }
+
+      // Main site: auto-login immediately
       await db.query('DELETE FROM user_sessions WHERE user_id = ?', [result.insertId]);
       const token = generateToken();
       const expiresAt = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
@@ -466,6 +582,14 @@ function registerFreemiumRoutes(app) {
         return res.status(401).json({ error: 'Invalid email or password' });
       }
 
+      // Check email verification (only enforced for tenant users)
+      if (user.email_verified === 0 || user.email_verified === '0') {
+        return res.status(403).json({
+          error: 'Please verify your email before logging in. Check your inbox.',
+          requiresVerification: true
+        });
+      }
+
       // Reset monthly if needed
       await ensureMonthReset(db, user.id, user.month_reset_date);
       const [refreshed] = await db.query('SELECT requests_this_month FROM users WHERE id = ?', [user.id]);
@@ -503,6 +627,141 @@ function registerFreemiumRoutes(app) {
     const db = await getPool();
     if (db) await db.query('DELETE FROM user_sessions WHERE token = ?', [token]);
     res.json({ ok: true });
+  });
+
+  // ── Change Password (logged-in user) ──
+  app.post('/api/user/change-password', userAuth, async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: 'Current password and new password are required' });
+    if (newPassword.length < 6) return res.status(400).json({ error: 'New password must be at least 6 characters' });
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    try {
+      const [users] = await db.query('SELECT password_hash FROM users WHERE id = ?', [req.user.user_id]);
+      if (users.length === 0) return res.status(404).json({ error: 'User not found' });
+
+      if (!verifyPassword(currentPassword, users[0].password_hash)) {
+        return res.status(401).json({ error: 'Current password is incorrect' });
+      }
+
+      const hash = hashPassword(newPassword);
+      await db.query('UPDATE users SET password_hash = ? WHERE id = ?', [hash, req.user.user_id]);
+
+      res.json({ ok: true, message: 'Password changed successfully' });
+    } catch (e) {
+      console.error('Change password error:', e.message);
+      res.status(500).json({ error: 'Failed to change password' });
+    }
+  });
+
+  // ── Email Verification ──
+  app.get('/api/user/verify-email', async (req, res) => {
+    const { token } = req.query;
+    if (!token) return res.status(400).json({ error: 'Verification token required' });
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    try {
+      const [rows] = await db.query(
+        'SELECT user_id FROM email_verifications WHERE token = ? AND expires_at > ? AND used = 0',
+        [token, Date.now()]
+      );
+      if (rows.length === 0) {
+        return res.status(400).json({ error: 'Invalid or expired verification link. Please request a new verification email.' });
+      }
+
+      const userId = rows[0].user_id;
+      try {
+        await db.query('UPDATE users SET email_verified = 1 WHERE id = ?', [userId]);
+      } catch (e) { /* column may not exist in all deploys */ }
+      await db.query('UPDATE email_verifications SET used = 1 WHERE token = ?', [token]);
+
+      res.json({ ok: true, message: 'Email verified successfully! You can now log in.' });
+    } catch (e) {
+      console.error('Verify email error:', e.message);
+      res.status(500).json({ error: 'Verification failed' });
+    }
+  });
+
+  // ── Resend Verification Email ──
+  app.post('/api/user/resend-verification', async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ error: 'Email required' });
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database unavailable' });
+
+    try {
+      let users;
+      try {
+        [users] = await db.query('SELECT id, email, tenant, email_verified FROM users WHERE email = ? AND is_active = 1', [email.toLowerCase().trim()]);
+      } catch (e) {
+        [users] = await db.query('SELECT id, email FROM users WHERE email = ? AND is_active = 1', [email.toLowerCase().trim()]);
+      }
+
+      // Always return success (don't reveal if email exists)
+      if (users.length === 0) {
+        return res.json({ ok: true, message: 'If that email exists and is unverified, a new verification link has been sent.' });
+      }
+
+      const user = users[0];
+
+      // Don't resend if already verified
+      if (user.email_verified === 1 || user.email_verified === '1' || user.email_verified === undefined) {
+        return res.json({ ok: true, message: 'If that email exists and is unverified, a new verification link has been sent.' });
+      }
+
+      const tenant = user.tenant || null;
+
+      // Invalidate old tokens
+      await db.query('UPDATE email_verifications SET used = 1 WHERE user_id = ?', [user.id]);
+
+      // Generate new token
+      const verifyToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + 24 * 60 * 60 * 1000;
+
+      try {
+        await db.query('INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)', [user.id, verifyToken, expiresAt]);
+      } catch (evErr) {
+        await db.query(`CREATE TABLE IF NOT EXISTS email_verifications (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          user_id INT NOT NULL,
+          token VARCHAR(128) NOT NULL UNIQUE,
+          expires_at BIGINT NOT NULL,
+          used TINYINT(1) DEFAULT 0,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+        await db.query('INSERT INTO email_verifications (user_id, token, expires_at) VALUES (?, ?, ?)', [user.id, verifyToken, expiresAt]);
+      }
+
+      const baseUrl = req.headers.origin || `${req.protocol}://${req.headers.host}`;
+      const verifyLink = tenant
+        ? `${baseUrl}/${tenant}/#/verify-email?token=${verifyToken}`
+        : `${baseUrl}/#/verify-email?token=${verifyToken}`;
+
+      await sendEmail(
+        user.email,
+        'Please verify your email',
+        `<div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:24px">
+          <h2 style="color:#1e40af;margin-bottom:16px">Verify Your Email</h2>
+          <p>You requested a new verification link. Click the button below to verify your email address.</p>
+          <p>This link expires in 24 hours.</p>
+          <p style="text-align:center;margin:32px 0">
+            <a href="${verifyLink}" style="background:#2563eb;color:#fff;padding:12px 32px;border-radius:6px;text-decoration:none;font-weight:600;display:inline-block">Verify Email</a>
+          </p>
+          <p style="font-size:13px;color:#666">If you did not register for this account, you can safely ignore this email.</p>
+          <p style="font-size:12px;color:#999;margin-top:24px">If the button doesn't work, copy and paste this link:<br>${verifyLink}</p>
+        </div>`
+      );
+
+      res.json({ ok: true, message: 'If that email exists and is unverified, a new verification link has been sent.' });
+    } catch (e) {
+      console.error('Resend verification error:', e.message);
+      res.json({ ok: true, message: 'If that email exists and is unverified, a new verification link has been sent.' });
+    }
   });
 
   // ── User Profile / Session Check ──
@@ -854,6 +1113,85 @@ function registerFreemiumRoutes(app) {
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ error: 'Failed to delete member' });
+    }
+  });
+
+  // ── Admin: Create member account ──
+  app.post('/api/admin/create-member', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { email, password, displayName, plan, tenant } = req.body;
+    if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
+    if (password.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    if (plan && !['free', 'pro', 'admin_free'].includes(plan)) {
+      return res.status(400).json({ error: 'Invalid plan. Must be free, pro, or admin_free' });
+    }
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database not configured yet. The admin needs to set up the MySQL connection in the admin panel (Database tab) and click Init Tables.' });
+
+    try {
+      const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      if (existing.length > 0) return res.status(409).json({ error: 'Email already registered' });
+
+      const hash = hashPassword(password);
+      const monthReset = getMonthResetDate();
+      const userPlan = plan || 'free';
+      const tenantVal = tenant || null;
+
+      try {
+        await db.query(
+          'INSERT INTO users (email, password_hash, display_name, plan, month_reset_date, email_verified, tenant) VALUES (?, ?, ?, ?, ?, 1, ?)',
+          [email.toLowerCase().trim(), hash, displayName || '', userPlan, monthReset, tenantVal]
+        );
+      } catch (colErr) {
+        // Fallback if columns don't exist yet
+        await db.query(
+          'INSERT INTO users (email, password_hash, display_name, plan, month_reset_date) VALUES (?, ?, ?, ?, ?)',
+          [email.toLowerCase().trim(), hash, displayName || '', userPlan, monthReset]
+        );
+      }
+
+      res.json({ ok: true, message: `Account created for ${email.toLowerCase().trim()} (${userPlan} plan, pre-verified)` });
+    } catch (e) {
+      console.error('Create member error:', e.message);
+      res.status(500).json({ error: 'Failed to create account: ' + e.message });
+    }
+  });
+
+  // ── Admin: Get tenant allowed email domain ──
+  app.get('/api/admin/tenant-email-domain', (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const tenantId = req.query.tenant || req.body && req.body.tenant || null;
+    const domain = getTenantEmailDomain(tenantId);
+    res.json({ allowedEmailDomain: domain || '' });
+  });
+
+  // ── Admin: Set tenant allowed email domain ──
+  app.post('/api/admin/tenant-email-domain', (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { tenant, allowedEmailDomain } = req.body;
+    if (!tenant) return res.status(400).json({ error: 'Tenant ID required' });
+
+    try {
+      const MT_HOME = process.env.HOME || process.env.USERPROFILE || '/tmp';
+      const cfgPath = path.join(MT_HOME, '.textappeal', 'tenants', tenant, 'admin-config.json');
+      let cfg = {};
+      if (fs.existsSync(cfgPath)) {
+        try { cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf8')); } catch(e) {}
+      }
+      cfg.allowedEmailDomain = (allowedEmailDomain || '').toLowerCase().trim();
+      fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+      fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2));
+      res.json({ ok: true, allowedEmailDomain: cfg.allowedEmailDomain });
+    } catch (e) {
+      console.error('Set tenant email domain error:', e.message);
+      res.status(500).json({ error: 'Failed to save domain setting' });
     }
   });
 

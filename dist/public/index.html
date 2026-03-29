@@ -1017,6 +1017,10 @@ async function doRegister(email, password, name) {
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data.error || "Registration failed");
+  if (data.requiresVerification) {
+    // Tenant user: must verify email before login
+    return { requiresVerification: true, message: data.message };
+  }
   setToken(data.token);
   currentUser = data.user;
   updateUI();
@@ -1099,6 +1103,7 @@ function renderUserBar() {
       (currentUser.plan === "pro" && currentUser.subscriptionStatus === "active"
         ? '<button class="ta-btn ta-btn-cancel" onclick="window.__taFreemium.doCancelSubscription()" style="font-size:11px;padding:3px 8px;background:transparent;color:#64748b;border:1px solid #64748b">' + (window.__taLang === "fr" ? "Annuler l\u2019abonnement" : "Cancel subscription") + '</button>'
         : '') +
+      '<button class="ta-btn" onclick="window.__taFreemium.showChangePasswordModal()" style="font-size:11px;padding:3px 8px;background:transparent;color:#94a3b8;border:1px solid #475569;border-radius:4px;cursor:pointer" title="' + (window.__taLang==='fr'?'Changer le mot de passe':'Change password') + '">&#x1f512;</button>' +
       '<button class="ta-btn ta-btn-logout" onclick="window.__taFreemium.doLogout()">' + __t("logout") + '</button>' +
       '<a href="' + getSiteLinkHref() + '" class="ta-btn ta-site-link" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("getCustomSite") + '</a>' +
       '<a href="' + (window.__taLang === 'fr' ? 'https://a.co/d/07c4LrCZ' : 'https://a.co/d/0e8L3V1K') + '" target="_blank" rel="noopener" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("buyBook") + '</a>' +
@@ -1219,12 +1224,39 @@ function showAuthModal(mode) {
 
     try {
       if (isRegister) {
-        await doRegister(email, pass, name);
+        const regResult = await doRegister(email, pass, name);
+        if (regResult && regResult.requiresVerification) {
+          // Show verification pending message instead of closing
+          errEl.style.color = '#059669';
+          errEl.textContent = regResult.message || 'Please check your email to verify your account.';
+          errEl.style.display = 'block';
+          btn.textContent = 'Check Your Email';
+          btn.disabled = true;
+          // Show resend link
+          const resendDiv = document.createElement('div');
+          resendDiv.style.cssText = 'margin-top:8px;font-size:12px;color:#64748b';
+          resendDiv.innerHTML = 'Didn\'t receive it? <a href="#" id="ta-resend-link" style="color:#2563eb">Resend verification email</a>';
+          errEl.insertAdjacentElement('afterend', resendDiv);
+          document.getElementById('ta-resend-link') && document.getElementById('ta-resend-link').addEventListener('click', async function(e) {
+            e.preventDefault();
+            this.textContent = 'Sending...';
+            try {
+              await origFetch('/api/user/resend-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+              });
+              this.textContent = 'Sent! Check your inbox.';
+            } catch(re) { this.textContent = 'Error sending'; }
+          });
+          return;
+        }
       } else {
         await doLogin(email, pass);
       }
       modal.remove();
     } catch(e) {
+      errEl.style.color = '';
       errEl.textContent = e.message;
       errEl.style.display = "block";
       btn.disabled = false;
@@ -1415,9 +1447,32 @@ function injectAdminSections() {
         '</div>' +
         '</div>' +
         '</div>' +
+        '</div>' +
+        // Tenant email domain section (only for tenant sub-sites)
+        (window.__tenant ? (
+          '<div class="shadcn-card rounded-xl border bg-card border-card-border text-card-foreground shadow-sm" style="margin-top:16px;padding:24px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>' +
+          '<h3 style="font-size:18px;font-weight:600;margin:0">Email Domain Restriction</h3></div>' +
+          '<p style="color:var(--muted-foreground,#64748b);font-size:14px;margin:0 0 16px">Restrict registration to users with a specific email domain (e.g. <code>cmn.ca</code>). Leave blank to allow all emails.</p>' +
+          '<div id="ta-email-domain-content">' +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+          '<input id="ta-email-domain-input" type="text" placeholder="e.g. cmn.ca" style="flex:1;min-width:180px;padding:7px 10px;border:1px solid var(--border,#e2e8f0);border-radius:6px;font-size:13px;background:var(--background,#fff);color:var(--foreground,#000)">' +
+          '<button class="ta-btn ta-btn-primary" style="font-size:12px;padding:6px 16px" onclick="window.__taFreemium.saveTenantEmailDomain()">Save</button>' +
+          '</div>' +
+          '<span id="ta-email-domain-status" style="font-size:12px;color:var(--muted-foreground,#64748b);display:block;margin-top:6px"></span>' +
+          '</div>' +
+          '</div>'
+        ) : '') +
         '</div>';
 
       container.appendChild(sections);
+
+      // Load tenant email domain config (if on tenant site)
+      if (window.__tenant) {
+        setTimeout(function() {
+          loadTenantEmailDomain();
+        }, 200);
+      }
 
       // Hide the React temperature slider (replaced by our dual sliders)
       function _hideOldTempSlider() {
@@ -1817,7 +1872,10 @@ async function showMembersPanel() {
     if (membersRes.ok) members = (await membersRes.json()).members || [];
     if (statsRes.ok) stats = await statsRes.json();
 
-    panel.innerHTML = '<h3>Member Management</h3>' +
+    panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">' +
+      '<h3 style="margin:0">Member Management</h3>' +
+      '<button class="ta-btn ta-btn-primary" style="font-size:12px;padding:6px 16px" onclick="window.__taFreemium.showCreateMemberForm()">+ Create Account</button>' +
+      '</div>' +
       '<div class="ta-stats-grid">' +
       '<div class="ta-stat-card"><div class="ta-stat-num">' + (stats.totalUsers || 0) + '</div><div class="ta-stat-label">Total Users</div></div>' +
       '<div class="ta-stat-card"><div class="ta-stat-num">' + (stats.proUsers || 0) + '</div><div class="ta-stat-label">Pro/Free(Admin)</div></div>' +
@@ -1852,6 +1910,181 @@ async function showMembersPanel() {
     panel.innerHTML = '<h3>Member Management</h3><p style="color:#ef4444">Error loading members: ' + escHtml(e.message) + '</p><p>Make sure the database is configured and tables are initialized.</p>';
   }
 }
+
+async function showCreateMemberForm() {
+  const adminToken = getAdminToken();
+  if (!adminToken) { alert("Admin login required"); return; }
+
+  let panel = document.getElementById("ta-members-content");
+  if (!panel) return;
+
+  const tenant = window.__tenant || null;
+
+  panel.insertAdjacentHTML('afterbegin',
+    '<div id="ta-create-member-form" style="background:var(--card,#fff);border:2px solid #2563eb;border-radius:8px;padding:16px;margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">' +
+    '<h4 style="margin:0;color:#1e40af">Create Account</h4>' +
+    '<button onclick="document.getElementById(\"ta-create-member-form\").remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#888">&times;</button>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Email *</label>' +
+    '<input id="ta-cm-email" type="email" placeholder="user@example.com" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box"></div>' +
+    '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Display Name</label>' +
+    '<input id="ta-cm-name" type="text" placeholder="Full name" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box"></div>' +
+    '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Password *</label>' +
+    '<input id="ta-cm-pass" type="password" placeholder="Min 6 characters" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;box-sizing:border-box"></div>' +
+    '<div><label style="font-size:12px;font-weight:600;display:block;margin-bottom:4px">Plan</label>' +
+    '<select id="ta-cm-plan" style="width:100%;padding:6px 8px;border:1px solid #e2e8f0;border-radius:6px;font-size:13px;background:#fff;box-sizing:border-box">' +
+    '<option value="free">Free</option>' +
+    '<option value="admin_free">Free (Admin Grant)</option>' +
+    '<option value="pro">Pro</option>' +
+    '</select></div>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-top:12px">' +
+    '<button class="ta-btn ta-btn-primary" style="font-size:12px;padding:6px 20px" onclick="window.__taFreemium.doCreateMember()">Create Account</button>' +
+    '<span id="ta-cm-status" style="font-size:12px"></span>' +
+    '</div>' +
+    '<p style="font-size:11px;color:#888;margin:8px 0 0">Admin-created accounts are pre-verified and can log in immediately.</p>' +
+    '</div>'
+  );
+}
+
+async function doCreateMember() {
+  const adminToken = getAdminToken();
+  if (!adminToken) return;
+
+  const email = (document.getElementById('ta-cm-email') || {}).value || '';
+  const name = (document.getElementById('ta-cm-name') || {}).value || '';
+  const pass = (document.getElementById('ta-cm-pass') || {}).value || '';
+  const plan = (document.getElementById('ta-cm-plan') || {}).value || 'free';
+  const status = document.getElementById('ta-cm-status');
+
+  if (!email || !pass) { if (status) { status.textContent = 'Email and password are required'; status.style.color = '#ef4444'; } return; }
+  if (pass.length < 6) { if (status) { status.textContent = 'Password must be at least 6 characters'; status.style.color = '#ef4444'; } return; }
+
+  if (status) { status.textContent = 'Creating...'; status.style.color = '#888'; }
+
+  try {
+    const r = await origFetch('/api/admin/create-member', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ email, displayName: name, password: pass, plan })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      if (status) { status.textContent = d.message || 'Account created!'; status.style.color = '#22c55e'; }
+      // Clear form
+      ['ta-cm-email','ta-cm-name','ta-cm-pass'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.value = '';
+      });
+      // Reload members after short delay
+      setTimeout(function() { window.__taFreemium.showMembersPanel(); }, 1500);
+    } else {
+      if (status) { status.textContent = d.error || 'Error creating account'; status.style.color = '#ef4444'; }
+    }
+  } catch(e) {
+    if (status) { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; }
+  }
+}
+
+async function loadTenantEmailDomain() {
+  if (!window.__tenant) return;
+  const adminToken = getAdminToken();
+  if (!adminToken) return;
+  try {
+    const r = await origFetch('/api/admin/tenant-email-domain', { headers: { 'x-admin-token': adminToken } });
+    if (r.ok) {
+      const d = await r.json();
+      const inp = document.getElementById('ta-email-domain-input');
+      if (inp) inp.value = d.allowedEmailDomain || '';
+    }
+  } catch(e) {}
+}
+
+async function saveTenantEmailDomain() {
+  if (!window.__tenant) return;
+  const adminToken = getAdminToken();
+  if (!adminToken) return;
+  const inp = document.getElementById('ta-email-domain-input');
+  const status = document.getElementById('ta-email-domain-status');
+  const domain = inp ? inp.value.trim() : '';
+  if (status) { status.textContent = 'Saving...'; status.style.color = '#888'; }
+  try {
+    const r = await origFetch('/api/admin/tenant-email-domain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+      body: JSON.stringify({ allowedEmailDomain: domain })
+    });
+    const d = await r.json();
+    if (r.ok) {
+      if (status) { status.textContent = domain ? ('Only @' + domain + ' emails allowed') : 'No restriction (all emails allowed)'; status.style.color = '#22c55e'; }
+      setTimeout(function() { if (status) { status.textContent = ''; status.style.color = ''; } }, 4000);
+    } else {
+      if (status) { status.textContent = d.error || 'Error saving'; status.style.color = '#ef4444'; }
+    }
+  } catch(e) {
+    if (status) { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; }
+  }
+}
+
+// ── Email verification hash handler ──
+(function() {
+  function handleVerifyEmailHash() {
+    var hash = window.location.hash;
+    if (!hash.startsWith('#/verify-email')) return;
+    var params = new URLSearchParams(hash.replace('#/verify-email', '').replace('?', ''));
+    var token = params.get('token');
+    if (!token) return;
+
+    // Show a verification in-progress message
+    var overlay = document.createElement('div');
+    overlay.id = 'ta-verify-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:9999';
+    overlay.innerHTML = '<div style="background:#fff;border-radius:12px;padding:32px;max-width:420px;width:90%;text-align:center">' +
+      '<div id="ta-verify-icon" style="font-size:48px;margin-bottom:16px">⏳</div>' +
+      '<h2 id="ta-verify-title" style="color:#1e40af;margin:0 0 12px">Verifying your email...</h2>' +
+      '<p id="ta-verify-msg" style="color:#64748b;margin:0 0 20px">Please wait.</p>' +
+      '<button id="ta-verify-btn" onclick="document.getElementById('ta-verify-overlay').remove();window.location.hash='';" style="display:none;background:#2563eb;color:#fff;padding:10px 24px;border:none;border-radius:6px;cursor:pointer;font-size:14px">Go to Login</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    origFetch('/api/user/verify-email?token=' + encodeURIComponent(token))
+      .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+      .then(function(result) {
+        var icon = document.getElementById('ta-verify-icon');
+        var title = document.getElementById('ta-verify-title');
+        var msg = document.getElementById('ta-verify-msg');
+        var btn = document.getElementById('ta-verify-btn');
+        if (result.ok) {
+          if (icon) icon.textContent = '✅';
+          if (title) { title.textContent = 'Email verified!'; title.style.color = '#059669'; }
+          if (msg) msg.textContent = result.data.message || 'Your email has been verified. You can now log in.';
+        } else {
+          if (icon) icon.textContent = '❌';
+          if (title) { title.textContent = 'Verification failed'; title.style.color = '#dc2626'; }
+          if (msg) msg.textContent = result.data.error || 'Invalid or expired verification link.';
+        }
+        if (btn) btn.style.display = 'inline-block';
+      })
+      .catch(function(e) {
+        var title = document.getElementById('ta-verify-title');
+        var msg = document.getElementById('ta-verify-msg');
+        var btn = document.getElementById('ta-verify-btn');
+        if (title) { title.textContent = 'Verification error'; title.style.color = '#dc2626'; }
+        if (msg) msg.textContent = 'Network error: ' + e.message;
+        if (btn) btn.style.display = 'inline-block';
+      });
+  }
+
+  // Run on page load and hash change
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleVerifyEmailHash);
+  } else {
+    handleVerifyEmailHash();
+  }
+  window.addEventListener('hashchange', handleVerifyEmailHash);
+})();
 
 async function showStripePanel() {
   const adminToken = getAdminToken();
@@ -2596,11 +2829,68 @@ async function doCancelSubscription() {
 })();
 
 // ═══ Export for onclick handlers ═══
+// ═══ Change Password Modal ═══
+function showChangePasswordModal() {
+  var L = window.__taLang || 'en';
+  var overlay = document.createElement('div');
+  overlay.className = 'ta-modal-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999';
+  overlay.innerHTML =
+    '<div style="background:#1e293b;border-radius:12px;padding:28px 32px;max-width:380px;width:90%;color:#e2e8f0;position:relative">' +
+      '<button onclick="this.closest(\'.ta-modal-overlay\').remove()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer">&times;</button>' +
+      '<h3 style="margin:0 0 18px;font-size:17px;color:#f1f5f9">' + (L==='fr'?'Changer le mot de passe':'Change Password') + '</h3>' +
+      '<div id="ta-cp-msg" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:12px;font-size:13px"></div>' +
+      '<label style="display:block;font-size:13px;color:#94a3b8;margin-bottom:4px">' + (L==='fr'?'Mot de passe actuel':'Current password') + '</label>' +
+      '<input id="ta-cp-current" type="password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:12px;box-sizing:border-box">' +
+      '<label style="display:block;font-size:13px;color:#94a3b8;margin-bottom:4px">' + (L==='fr'?'Nouveau mot de passe':'New password') + '</label>' +
+      '<input id="ta-cp-new" type="password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:12px;box-sizing:border-box">' +
+      '<label style="display:block;font-size:13px;color:#94a3b8;margin-bottom:4px">' + (L==='fr'?'Confirmer le nouveau mot de passe':'Confirm new password') + '</label>' +
+      '<input id="ta-cp-confirm" type="password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:18px;box-sizing:border-box">' +
+      '<button onclick="window.__taFreemium.doChangePassword()" style="width:100%;padding:10px;border-radius:6px;border:none;background:#2563eb;color:#fff;font-size:14px;font-weight:600;cursor:pointer">' + (L==='fr'?'Enregistrer':'Save') + '</button>' +
+    '</div>';
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
+  setTimeout(function() { document.getElementById('ta-cp-current').focus(); }, 100);
+}
+
+async function doChangePassword() {
+  var L = window.__taLang || 'en';
+  var cur = (document.getElementById('ta-cp-current') || {}).value || '';
+  var nw = (document.getElementById('ta-cp-new') || {}).value || '';
+  var conf = (document.getElementById('ta-cp-confirm') || {}).value || '';
+  var msgEl = document.getElementById('ta-cp-msg');
+  function showMsg(txt, isErr) {
+    if (!msgEl) return;
+    msgEl.textContent = txt;
+    msgEl.style.display = 'block';
+    msgEl.style.background = isErr ? '#7f1d1d' : '#14532d';
+    msgEl.style.color = isErr ? '#fca5a5' : '#86efac';
+  }
+  if (!cur) return showMsg(L==='fr'?'Entrez votre mot de passe actuel':'Enter your current password', true);
+  if (!nw || nw.length < 6) return showMsg(L==='fr'?'Le nouveau mot de passe doit contenir au moins 6 caract\u00e8res':'New password must be at least 6 characters', true);
+  if (nw !== conf) return showMsg(L==='fr'?'Les mots de passe ne correspondent pas':'Passwords do not match', true);
+  try {
+    var prefix = window.__tenantApiPrefix || '';
+    var token = localStorage.getItem('ta_user_token');
+    var r = await fetch(prefix + '/api/user/change-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-user-token': token || '' },
+      body: JSON.stringify({ currentPassword: cur, newPassword: nw })
+    });
+    var data = await r.json();
+    if (!r.ok) return showMsg(data.error || 'Error', true);
+    showMsg(L==='fr'?'Mot de passe modifi\u00e9 avec succ\u00e8s':'Password changed successfully', false);
+    setTimeout(function() { var ov = document.querySelector('.ta-modal-overlay'); if (ov) ov.remove(); }, 1500);
+  } catch(e) { showMsg(e.message, true); }
+}
+
 window.__taFreemium = {
   showAuthModal, doLogout, doSubscribe, showMembersPanel, showStripePanel, showDatabasePanel, showSmtpPanel,
   updateMemberPlan, toggleMember, deleteMember, initDb,
   updateUI, renderLangToggle, renderDirectionToggle, renderStyleToggle, renderCreativitySlider, setCreativity,
-  showLostPasswordModal, doCancelSubscription
+  showLostPasswordModal, doCancelSubscription,
+  showCreateMemberForm, doCreateMember, saveTenantEmailDomain, loadTenantEmailDomain,
+  showChangePasswordModal, doChangePassword
 };
 
 // ═══ Initialize ═══
