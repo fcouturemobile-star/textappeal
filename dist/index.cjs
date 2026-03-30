@@ -2528,8 +2528,10 @@ setTimeout(function _setupMultiTenant() {
         ma.handle(req, res, function() { res.status(404).json({ error: 'Not found' }); });
       });
 
-      // Tenant user login (pass through — freemium.cjs handles email_verified check)
+      // Tenant user login (inject tenant ID for scoped login)
       router.post('/api/user/login', function(req, res) {
+        if (!req.body) req.body = {};
+        req.body.tenant = tenantId;
         req.url = '/api/user/login';
         req.baseUrl = '';
         ma.handle(req, res, function() { res.status(404).json({ error: 'Not found' }); });
