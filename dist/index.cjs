@@ -1156,7 +1156,7 @@ async function termiumSearch(words, direction) {
       .then(function(resp) { return resp.ok ? resp.text() : ''; })
       .then(function(html) {
         if (!html) return null;
-        var countMatch = html.match(/\[(\d+) record/);
+        var countMatch = html.match(/\[(\d+) (?:record|fiche)/);
         if (!countMatch || countMatch[1] === '0') return null;
         var enSpans = html.match(/<span[^>]*lang="en"[^>]*>([^<]+)/g) || [];
         var frSpans = html.match(/<span[^>]*lang="fr"[^>]*>([^<]+)/g) || [];
@@ -2031,6 +2031,19 @@ setTimeout(function _setupMultiTenant() {
   }
 
   // ── Glossary matching ──────────────────────────────────────────────────
+  // Word boundary helper: checks that a match at position idx of length len
+  // is a whole word (not a substring of a longer word)
+  function _mtIsWordBoundary(text, idx, len) {
+    // Characters that count as word characters (letters, digits, accented chars, hyphens in compounds)
+    var wordCharRe = /[\w\u00C0-\u024F'-]/;
+    // Check character before match
+    if (idx > 0 && wordCharRe.test(text[idx - 1])) return false;
+    // Check character after match
+    var endIdx = idx + len;
+    if (endIdx < text.length && wordCharRe.test(text[endIdx])) return false;
+    return true;
+  }
+
   function _mtMatchGlossary(text, tenantId, direction) {
     var glossary = _mtTenantData[tenantId] ? _mtTenantData[tenantId].glossary : [];
     var lower = text.toLowerCase();
@@ -2041,9 +2054,11 @@ setTimeout(function _setupMultiTenant() {
       var entry = glossary[i];
       // For FR→EN, search the French column (target); for EN→FR, search the English column (source)
       var searchTerm = isFrToEn ? (entry.target || '').toLowerCase() : entry.sourceLower;
-      if (!searchTerm) continue;
+      if (!searchTerm || searchTerm.length < 2) continue;
       var idx = lower.indexOf(searchTerm);
       if (idx !== -1) {
+        // Word boundary check: reject partial matches inside longer words
+        if (!_mtIsWordBoundary(lower, idx, searchTerm.length)) continue;
         var end = idx + searchTerm.length;
         var skip = false;
         for (var j = 0; j < ranges.length; j++) {
