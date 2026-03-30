@@ -567,14 +567,20 @@ function registerFreemiumRoutes(app) {
 
   // ── User Login ──
   app.post('/api/user/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { email, password, tenant } = req.body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password required' });
 
     const db = await getPool();
     if (!db) return res.status(503).json({ error: 'Database not configured yet. The admin needs to set up the MySQL connection in the admin panel (Database tab) and click Init Tables.' });
 
     try {
-      const [users] = await db.query('SELECT * FROM users WHERE email = ? AND is_active = 1', [email.toLowerCase().trim()]);
+      // Scope login to the correct tenant (or main site if no tenant)
+      let users;
+      if (tenant) {
+        [users] = await db.query('SELECT * FROM users WHERE email = ? AND is_active = 1 AND tenant = ?', [email.toLowerCase().trim(), tenant]);
+      } else {
+        [users] = await db.query('SELECT * FROM users WHERE email = ? AND is_active = 1 AND (tenant IS NULL OR tenant = ?)', [email.toLowerCase().trim(), '']);
+      }
       if (users.length === 0) return res.status(401).json({ error: 'Invalid email or password' });
 
       const user = users[0];
@@ -1052,9 +1058,20 @@ function registerFreemiumRoutes(app) {
     if (!db) return res.status(503).json({ error: 'Database not configured yet. The admin needs to set up the MySQL connection in the admin panel (Database tab) and click Init Tables.' });
 
     try {
-      const [members] = await db.query(
-        'SELECT id, email, display_name, plan, requests_this_month, subscription_status, is_active, created_at FROM users ORDER BY created_at DESC'
-      );
+      // Scope members to tenant if x-tenant header is present
+      const tenantScope = req.headers['x-tenant'] || req.query.tenant || null;
+      let members;
+      if (tenantScope) {
+        [members] = await db.query(
+          'SELECT id, email, display_name, plan, requests_this_month, subscription_status, is_active, created_at, tenant FROM users WHERE tenant = ? ORDER BY created_at DESC',
+          [tenantScope]
+        );
+      } else {
+        [members] = await db.query(
+          'SELECT id, email, display_name, plan, requests_this_month, subscription_status, is_active, created_at, tenant FROM users WHERE (tenant IS NULL OR tenant = ?) ORDER BY created_at DESC',
+          ['']
+        );
+      }
       res.json({ members });
     } catch (e) {
       console.error('Get members error:', e.message);

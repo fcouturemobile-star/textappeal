@@ -2593,13 +2593,41 @@ setTimeout(function _setupMultiTenant() {
       // ── Shared admin endpoints (proxy to main app) ──
       // Stripe, DB, SMTP, Members, Usage — these are shared infrastructure, not tenant-specific.
       // We forward these to the main app's handlers by rewriting the URL.
+      // Members endpoint: tenant-scoped (inject x-tenant header)
+      router.all('/api/admin/members', function(req, res) {
+        req.headers['x-tenant'] = tenantId;
+        var origUrl = req.url;
+        var origBaseUrl = req.baseUrl;
+        req.url = '/api/admin/members';
+        req.baseUrl = '';
+        ma.handle(req, res, function() {
+          req.url = origUrl;
+          req.baseUrl = origBaseUrl;
+          res.status(404).json({ error: 'Not found' });
+        });
+      });
+
+      // Create member: inject tenant
+      router.post('/api/admin/create-member', function(req, res) {
+        if (!req.body) req.body = {};
+        req.body.tenant = tenantId;
+        var origUrl = req.url;
+        var origBaseUrl = req.baseUrl;
+        req.url = '/api/admin/create-member';
+        req.baseUrl = '';
+        ma.handle(req, res, function() {
+          req.url = origUrl;
+          req.baseUrl = origBaseUrl;
+          res.status(404).json({ error: 'Not found' });
+        });
+      });
+
       var _sharedAdminPaths = [
         '/api/admin/stripe-config',
         '/api/admin/db-config',
         '/api/admin/db-init',
         '/api/admin/smtp-config',
         '/api/admin/smtp-test',
-        '/api/admin/members',
         '/api/admin/usage-stats',
         '/api/admin/credentials',
         '/api/admin/models',
@@ -2608,8 +2636,6 @@ setTimeout(function _setupMultiTenant() {
       ];
       _sharedAdminPaths.forEach(function(sharedPath) {
         router.all(sharedPath, function(req, res) {
-          // Forward to main app by calling the main handler directly
-          // Save original URL, rewrite to remove tenant prefix, call main app, restore
           var origUrl = req.url;
           var origBaseUrl = req.baseUrl;
           req.url = sharedPath;
@@ -2621,8 +2647,9 @@ setTimeout(function _setupMultiTenant() {
           });
         });
       });
-      // Members sub-routes (PUT, DELETE with :id)
+      // Members sub-routes (PUT, DELETE with :id) — inject tenant header
       router.all('/api/admin/members/:id/*splat', function(req, res) {
+        req.headers['x-tenant'] = tenantId;
         var origUrl = req.url;
         var origBaseUrl = req.baseUrl;
         req.url = '/api/admin/members/' + req.params.id + '/' + req.params.splat;
@@ -2634,6 +2661,7 @@ setTimeout(function _setupMultiTenant() {
         });
       });
       router.all('/api/admin/members/:id', function(req, res) {
+        req.headers['x-tenant'] = tenantId;
         var origUrl = req.url;
         var origBaseUrl = req.baseUrl;
         req.url = '/api/admin/members/' + req.params.id;
