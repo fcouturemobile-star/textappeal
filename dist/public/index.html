@@ -499,6 +499,7 @@ window.__i18n = {
   en: {
     createFreeAccount: "Create Free Account",
     getCustomSite: "Get Your Own Custom Site",
+    translateDoc: "Translate a document",
     buyBook: "Buy the Text Appeal\u2122 book",
     logIn: "Log In",
     logout: "Logout",
@@ -546,6 +547,7 @@ window.__i18n = {
   fr: {
     createFreeAccount: "Cr\u00e9ez un compte gratuit",
     getCustomSite: "Procurez-vous un site personnalis\u00e9",
+    translateDoc: "Traduire un document",
     buyBook: "Achetez le livre Text Appeal\u2122",
     logIn: "Connexion",
     logout: "Déconnexion",
@@ -1105,6 +1107,7 @@ function renderUserBar() {
         : '') +
       '<button class="ta-btn" onclick="window.__taFreemium.showChangePasswordModal()" style="font-size:11px;padding:3px 8px;background:transparent;color:#94a3b8;border:1px solid #475569;border-radius:4px;cursor:pointer" title="' + (window.__taLang==='fr'?'Changer le mot de passe':'Change password') + '">&#x1f512;</button>' +
       '<button class="ta-btn ta-btn-logout" onclick="window.__taFreemium.doLogout()">' + __t("logout") + '</button>' +
+      '<a href="mailto:' + (window.__taLang === 'fr' ? 'fcouture@traductionsvoila.com' : 'fcouture@voilatranslations.com') + '" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("translateDoc") + '</a>' +
       '<a href="' + getSiteLinkHref() + '" class="ta-btn ta-site-link" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("getCustomSite") + '</a>' +
       '<a href="' + (window.__taLang === 'fr' ? 'https://a.co/d/07c4LrCZ' : 'https://a.co/d/0e8L3V1K') + '" target="_blank" rel="noopener" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("buyBook") + '</a>' +
       '</div>';
@@ -1113,6 +1116,7 @@ function renderUserBar() {
     bar.innerHTML = '<div class="ta-user-bar-inner">' +
       '<button class="ta-btn ta-btn-login" onclick="window.__taFreemium.showAuthModal(\'login\')">' + __t("logIn") + '</button>' +
       '<button class="ta-btn ta-btn-register" onclick="window.__taFreemium.showAuthModal(\'register\')">' + __t("createFreeAccount") + '</button>' +
+      '<a href="mailto:' + (window.__taLang === 'fr' ? 'fcouture@traductionsvoila.com' : 'fcouture@voilatranslations.com') + '" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("translateDoc") + '</a>' +
       '<a href="' + getSiteLinkHref() + '" class="ta-btn ta-site-link" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("getCustomSite") + '</a>' +
       '<a href="' + (window.__taLang === 'fr' ? 'https://a.co/d/07c4LrCZ' : 'https://a.co/d/0e8L3V1K') + '" target="_blank" rel="noopener" class="ta-btn" style="font-size:12px;padding:4px 12px;background:transparent;border:1px solid rgba(255,255,255,0.4);color:rgba(255,255,255,0.85);text-decoration:none;border-radius:6px;white-space:nowrap">' + __t("buyBook") + '</a>' +
       '</div>';
