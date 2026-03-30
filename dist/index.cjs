@@ -1236,7 +1236,7 @@ async function webTermSearch(plainText, glossaryMatches, cfg, direction) {
       'CRITICAL RULES:\n' +
       '1. Every term you return MUST appear word-for-word in the source text below. Do NOT invent, infer, or suggest terms that are not present.\n' +
       '2. Only include terms that a professional translator would look up: titles, program names, institutional terms, policy vocabulary, domain-specific expressions.\n' +
-      '3. Do NOT include common English words, personal names, place names, or generic vocabulary.\n\n' +
+      '3. Do NOT include common ' + _srcLabel + ' words, personal names, place names, or generic vocabulary.\n\n' +
       'EXCLUDE these terms (already in glossary): ' + (Array.from(knownTerms).join(', ') || '(none)') + '\n\n' +
       'Return ONLY a JSON array of strings that appear verbatim in the text. Return [] if nothing qualifies.\n\n' +
       'Text:\n' + _cleanText;
