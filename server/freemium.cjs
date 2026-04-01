@@ -1177,6 +1177,101 @@ function registerFreemiumRoutes(app) {
     }
   });
 
+  // ── Admin: Import members from CSV ──
+  // CSV format: First name, Last name, Email, Password
+  app.post('/api/admin/import-members', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { csvData, tenant } = req.body;
+    if (!csvData) return res.status(400).json({ error: 'No CSV data provided' });
+
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'Database not configured' });
+
+    try {
+      const lines = csvData.split('\n');
+      const tenantVal = tenant || null;
+      let imported = 0, skipped = 0, errors = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        // Parse CSV (handle quoted fields)
+        const fields = [];
+        let current = '', inQuotes = false;
+        for (let c = 0; c < line.length; c++) {
+          if (line[c] === '"') { inQuotes = !inQuotes; }
+          else if ((line[c] === ',' || line[c] === ';') && !inQuotes) { fields.push(current.trim()); current = ''; }
+          else { current += line[c]; }
+        }
+        fields.push(current.trim());
+
+        if (fields.length < 4) {
+          // Skip header row or incomplete rows
+          if (i === 0) continue; // likely header
+          errors.push('Row ' + (i + 1) + ': not enough columns (' + fields.length + ')');
+          continue;
+        }
+
+        const firstName = fields[0].replace(/^"|"$/g, '').trim();
+        const lastName = fields[1].replace(/^"|"$/g, '').trim();
+        const email = fields[2].replace(/^"|"$/g, '').trim().toLowerCase();
+        const password = fields[3].replace(/^"|"$/g, '').trim();
+
+        // Skip header row detection
+        if (email === 'email' || email === 'courriel' || email === 'e-mail') continue;
+
+        if (!email || !email.includes('@')) {
+          errors.push('Row ' + (i + 1) + ': invalid email "' + email + '"');
+          continue;
+        }
+        if (!password || password.length < 6) {
+          errors.push('Row ' + (i + 1) + ': password too short for ' + email);
+          continue;
+        }
+
+        // Check if user already exists (scoped to tenant)
+        let existing;
+        if (tenantVal) {
+          [existing] = await db.query('SELECT id FROM users WHERE email = ? AND tenant = ?', [email, tenantVal]);
+        } else {
+          [existing] = await db.query('SELECT id FROM users WHERE email = ? AND (tenant IS NULL OR tenant = ?)', [email, '']);
+        }
+        if (existing.length > 0) {
+          skipped++;
+          continue;
+        }
+
+        const displayName = (firstName + ' ' + lastName).trim();
+        const hash = hashPassword(password);
+        const monthReset = getMonthResetDate();
+
+        try {
+          await db.query(
+            'INSERT INTO users (email, password_hash, display_name, plan, month_reset_date, email_verified, tenant) VALUES (?, ?, ?, ?, ?, 1, ?)',
+            [email, hash, displayName, 'free', monthReset, tenantVal]
+          );
+          imported++;
+        } catch (insertErr) {
+          errors.push('Row ' + (i + 1) + ': ' + insertErr.message);
+        }
+      }
+
+      res.json({
+        ok: true,
+        imported: imported,
+        skipped: skipped,
+        errors: errors.length > 0 ? errors : undefined,
+        message: imported + ' user(s) imported, ' + skipped + ' skipped (already exist)' + (errors.length > 0 ? ', ' + errors.length + ' error(s)' : '')
+      });
+    } catch (e) {
+      console.error('Import members error:', e.message);
+      res.status(500).json({ error: 'Import failed: ' + e.message });
+    }
+  });
+
   // ── Admin: Get tenant allowed email domain ──
   app.get('/api/admin/tenant-email-domain', (req, res) => {
     const adminToken = req.headers['x-admin-token'];

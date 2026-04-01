@@ -1887,6 +1887,7 @@ async function showMembersPanel() {
     panel.innerHTML = '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:4px">' +
       '<h3 style="margin:0">Member Management</h3>' +
       '<button class="ta-btn ta-btn-primary" style="font-size:12px;padding:6px 16px" onclick="window.__taFreemium.showCreateMemberForm()">+ Create Account</button>' +
+      '<button class="ta-btn" style="font-size:12px;padding:6px 16px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="window.__taFreemium.showImportMembersForm()">Import CSV</button>' +
       '</div>' +
       '<div class="ta-stats-grid">' +
       '<div class="ta-stat-card"><div class="ta-stat-num">' + (stats.totalUsers || 0) + '</div><div class="ta-stat-label">Total Users</div></div>' +
@@ -1998,6 +1999,62 @@ async function doCreateMember() {
   } catch(e) {
     if (status) { status.textContent = 'Error: ' + e.message; status.style.color = '#ef4444'; }
   }
+}
+
+// ═══ Import Members from CSV ═══
+function showImportMembersForm() {
+  var panel = document.getElementById('ta-members-content');
+  if (!panel) return;
+  // Check if form already shown
+  if (document.getElementById('ta-import-form')) return;
+  var formHtml = '<div id="ta-import-form" style="background:var(--card,#f0fdf4);border:1px solid #86efac;border-radius:8px;padding:16px;margin-bottom:16px">' +
+    '<h4 style="margin:0 0 8px;color:#059669">Import Users from CSV</h4>' +
+    '<p style="font-size:13px;color:#64748b;margin:0 0 12px">CSV format: <b>First name, Last name, Email, Password</b> (comma or semicolon separated). Header row is auto-skipped. Existing users are skipped.</p>' +
+    '<input type="file" id="ta-import-file" accept=".csv,.txt" style="margin-bottom:10px;font-size:13px">' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<button class="ta-btn" style="font-size:12px;padding:6px 20px;background:#059669;color:#fff;border:none;border-radius:6px;cursor:pointer" onclick="window.__taFreemium.doImportMembers()">Import</button>' +
+    '<button class="ta-btn" style="font-size:12px;padding:6px 12px;background:transparent;color:#64748b;border:1px solid #94a3b8;border-radius:6px;cursor:pointer" onclick="document.getElementById(\'ta-import-form\').remove()">Cancel</button>' +
+    '<span id="ta-import-status" style="font-size:13px"></span>' +
+    '</div></div>';
+  panel.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+async function doImportMembers() {
+  var fileInput = document.getElementById('ta-import-file');
+  var status = document.getElementById('ta-import-status');
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    if (status) { status.textContent = 'Please select a CSV file'; status.style.color = '#ef4444'; }
+    return;
+  }
+  var adminToken = getAdminToken();
+  if (!adminToken) { if (status) { status.textContent = 'Not authenticated'; status.style.color = '#ef4444'; } return; }
+
+  if (status) { status.textContent = 'Reading file...'; status.style.color = '#888'; }
+
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var csvData = e.target.result;
+    if (status) { status.textContent = 'Importing...'; status.style.color = '#888'; }
+    try {
+      var r = await origFetch('/api/admin/import-members', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-token': adminToken },
+        body: JSON.stringify({ csvData: csvData })
+      });
+      var d = await r.json();
+      if (r.ok) {
+        var msg = d.message || (d.imported + ' imported, ' + d.skipped + ' skipped');
+        if (d.errors && d.errors.length > 0) msg += '\n' + d.errors.slice(0, 5).join('\n');
+        if (status) { status.textContent = msg; status.style.color = '#22c55e'; }
+        setTimeout(function() { window.__taFreemium.showMembersPanel(); }, 2000);
+      } else {
+        if (status) { status.textContent = d.error || 'Import failed'; status.style.color = '#ef4444'; }
+      }
+    } catch(err) {
+      if (status) { status.textContent = 'Error: ' + err.message; status.style.color = '#ef4444'; }
+    }
+  };
+  reader.readAsText(fileInput.files[0]);
 }
 
 async function loadTenantEmailDomain() {
@@ -2902,6 +2959,7 @@ window.__taFreemium = {
   updateUI, renderLangToggle, renderDirectionToggle, renderStyleToggle, renderCreativitySlider, setCreativity,
   showLostPasswordModal, doCancelSubscription,
   showCreateMemberForm, doCreateMember, saveTenantEmailDomain, loadTenantEmailDomain,
+  showImportMembersForm, doImportMembers,
   showChangePasswordModal, doChangePassword
 };
 

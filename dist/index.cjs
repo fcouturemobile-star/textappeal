@@ -2668,6 +2668,21 @@ setTimeout(function _setupMultiTenant() {
         });
       });
 
+      // Import members: inject tenant
+      router.post('/api/admin/import-members', function(req, res) {
+        if (!req.body) req.body = {};
+        req.body.tenant = tenantId;
+        var origUrl = req.url;
+        var origBaseUrl = req.baseUrl;
+        req.url = '/api/admin/import-members';
+        req.baseUrl = '';
+        ma.handle(req, res, function() {
+          req.url = origUrl;
+          req.baseUrl = origBaseUrl;
+          res.status(404).json({ error: 'Not found' });
+        });
+      });
+
       var _sharedAdminPaths = [
         '/api/admin/stripe-config',
         '/api/admin/db-config',
