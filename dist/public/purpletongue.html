@@ -1,0 +1,2056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Purple Tongue — Quadrilingual Translation</title>
+<style>
+:root {
+  --pt-purple: #4D148C;
+  --pt-orange: #FF6600;
+  --pt-bg: #1a0a2e;
+  --pt-surface: #2d1654;
+  --pt-surface2: #3d2070;
+  --pt-text: #f0e6ff;
+  --pt-muted: #a88fd4;
+  --pt-border: #5a3a8a;
+  --pt-hover: #3d2070;
+  --pt-input-bg: #1f0e3a;
+  --pt-success: #22c55e;
+  --pt-error: #ef4444;
+  --pt-radius: 10px;
+  --pt-gap: 16px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--pt-bg);
+  color: var(--pt-text);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+a { color: var(--pt-orange); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── HEADER ── */
+.pt-header {
+  background: linear-gradient(135deg, var(--pt-purple) 0%, #2a0a5e 100%);
+  border-bottom: 2px solid var(--pt-orange);
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-height: 64px;
+}
+
+.pt-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
+.pt-logo svg { flex-shrink: 0; }
+
+.pt-logo-text {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.pt-logo-text span:first-child { color: var(--pt-text); }
+.pt-logo-text span:last-child { color: var(--pt-orange); }
+
+.pt-header-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.pt-lang-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pt-select {
+  background: var(--pt-input-bg);
+  color: var(--pt-text);
+  border: 1px solid var(--pt-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.pt-select:hover, .pt-select:focus { border-color: var(--pt-orange); }
+
+.pt-swap-btn {
+  background: none;
+  border: 1px solid var(--pt-border);
+  color: var(--pt-orange);
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+.pt-swap-btn:hover { background: var(--pt-surface); border-color: var(--pt-orange); }
+
+.pt-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pt-ui-lang-toggle {
+  display: flex;
+  background: var(--pt-input-bg);
+  border: 1px solid var(--pt-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.pt-ui-lang-btn {
+  background: none;
+  border: none;
+  color: var(--pt-muted);
+  padding: 5px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pt-ui-lang-btn.active { background: var(--pt-purple); color: var(--pt-text); }
+
+.pt-btn {
+  background: var(--pt-orange);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.pt-btn:hover { background: #e05500; transform: translateY(-1px); }
+.pt-btn:active { transform: none; }
+.pt-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+.pt-btn-ghost {
+  background: none;
+  color: var(--pt-muted);
+  border: 1px solid var(--pt-border);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pt-btn-ghost:hover { background: var(--pt-surface); color: var(--pt-text); }
+
+.pt-user-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: var(--pt-muted);
+}
+.pt-user-info span { font-weight: 600; color: var(--pt-text); }
+
+/* ── MAIN ── */
+.pt-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px 24px;
+  gap: 16px;
+}
+
+.pt-direction-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 0.9rem;
+  color: var(--pt-muted);
+  font-weight: 500;
+}
+.pt-direction-bar .lang-name {
+  color: var(--pt-text);
+  font-weight: 700;
+}
+.pt-direction-bar .arrow {
+  color: var(--pt-orange);
+  font-size: 1.1rem;
+}
+
+/* ── 3-PANE LAYOUT ── */
+.pt-panes {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: var(--pt-gap);
+  flex: 1;
+  min-height: 0;
+}
+
+.pt-pane {
+  background: var(--pt-surface);
+  border: 1px solid var(--pt-border);
+  border-radius: var(--pt-radius);
+  display: flex;
+  flex-direction: column;
+  min-height: 400px;
+  overflow: hidden;
+}
+
+.pt-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--pt-border);
+  background: rgba(0,0,0,0.2);
+}
+
+.pt-pane-label {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--pt-muted);
+}
+
+.pt-pane-badge {
+  font-size: 0.7rem;
+  background: var(--pt-purple);
+  color: var(--pt-text);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.pt-editor {
+  flex: 1;
+  padding: 14px 16px;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: var(--pt-text);
+  outline: none;
+  overflow-y: auto;
+  min-height: 200px;
+}
+.pt-editor[contenteditable="true"] {
+  background: var(--pt-input-bg);
+  cursor: text;
+}
+.pt-editor[contenteditable="true"]:empty::before {
+  content: attr(data-placeholder);
+  color: var(--pt-muted);
+  pointer-events: none;
+}
+.pt-editor[contenteditable="false"] {
+  background: rgba(0,0,0,0.15);
+  color: var(--pt-text);
+}
+.pt-editor[contenteditable="false"].empty {
+  color: var(--pt-muted);
+  font-style: italic;
+}
+
+/* Preserve Word paste formatting */
+.pt-editor b, .pt-editor strong { font-weight: 700; }
+.pt-editor i, .pt-editor em { font-style: italic; }
+.pt-editor u { text-decoration: underline; }
+.pt-editor h1, .pt-editor h2, .pt-editor h3 { font-weight: 700; margin: 8px 0 4px; }
+.pt-editor ul, .pt-editor ol { padding-left: 1.5em; }
+.pt-editor li { margin: 2px 0; }
+
+.pt-pane-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--pt-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pt-char-count {
+  font-size: 0.75rem;
+  color: var(--pt-muted);
+}
+
+.pt-llm-tag {
+  font-size: 0.72rem;
+  color: var(--pt-muted);
+  font-style: italic;
+}
+
+/* ── CENTER ACTION AREA ── */
+.pt-translate-area {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--pt-border);
+}
+
+/* ── SPINNER ── */
+.pt-spinner {
+  display: none;
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: pt-spin 0.7s linear infinite;
+}
+@keyframes pt-spin { to { transform: rotate(360deg); } }
+.pt-spinner.active { display: inline-block; }
+
+/* ── FOOTER ── */
+.pt-footer {
+  background: rgba(0,0,0,0.3);
+  border-top: 1px solid var(--pt-border);
+  padding: 14px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: var(--pt-muted);
+}
+
+.pt-footer-left { display: flex; align-items: center; gap: 12px; }
+.pt-footer-right { display: flex; align-items: center; gap: 8px; }
+
+/* ── MODAL / OVERLAY ── */
+.pt-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 9000;
+  overflow-y: auto;
+  padding: 32px 16px;
+}
+.pt-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+
+.pt-modal {
+  background: var(--pt-surface);
+  border: 1px solid var(--pt-border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+
+.pt-modal-title {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--pt-text);
+}
+
+.pt-modal-close {
+  position: absolute;
+  top: 16px; right: 16px;
+  background: none;
+  border: none;
+  color: var(--pt-muted);
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 4px;
+}
+.pt-modal-close:hover { color: var(--pt-text); }
+
+/* ── ADMIN PANEL ── */
+.pt-admin {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: var(--pt-bg);
+  z-index: 10000;
+  overflow-y: auto;
+  flex-direction: column;
+}
+.pt-admin.open { display: flex; }
+
+.pt-admin-header {
+  background: linear-gradient(135deg, var(--pt-purple), #2a0a5e);
+  border-bottom: 2px solid var(--pt-orange);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.pt-admin-header h1 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--pt-orange);
+}
+
+.pt-admin-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.pt-admin-nav {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--pt-surface);
+  border-right: 1px solid var(--pt-border);
+  padding: 16px 0;
+  overflow-y: auto;
+}
+
+.pt-admin-nav-item {
+  display: block;
+  padding: 10px 20px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--pt-muted);
+  cursor: pointer;
+  transition: all 0.15s;
+  border-left: 3px solid transparent;
+  background: none;
+  border-right: none;
+  border-top: none;
+  border-bottom: none;
+  text-align: left;
+  width: 100%;
+}
+.pt-admin-nav-item:hover { background: var(--pt-hover); color: var(--pt-text); }
+.pt-admin-nav-item.active { background: var(--pt-hover); color: var(--pt-orange); border-left-color: var(--pt-orange); font-weight: 700; }
+
+.pt-admin-content {
+  flex: 1;
+  padding: 28px;
+  overflow-y: auto;
+}
+
+.pt-admin-section { display: none; }
+.pt-admin-section.active { display: block; }
+
+.pt-admin-section h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--pt-orange);
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--pt-border);
+}
+
+.pt-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.pt-form-group label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--pt-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.pt-input {
+  background: var(--pt-input-bg);
+  color: var(--pt-text);
+  border: 1px solid var(--pt-border);
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 0.9rem;
+  outline: none;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+.pt-input:focus { border-color: var(--pt-orange); }
+.pt-input::placeholder { color: var(--pt-muted); opacity: 0.7; }
+select.pt-input { cursor: pointer; }
+input[type="file"].pt-input { cursor: pointer; }
+
+.pt-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pt-alert {
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 12px;
+  display: none;
+}
+.pt-alert.success { background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.4); color: var(--pt-success); display: block; }
+.pt-alert.error { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); color: var(--pt-error); display: block; }
+
+.pt-subsection {
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--pt-border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.pt-subsection h3 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--pt-purple);
+  background: var(--pt-orange);
+  color: #fff;
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  margin-bottom: 14px;
+}
+
+.pt-doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+.pt-doc-table th {
+  text-align: left;
+  padding: 8px 12px;
+  background: var(--pt-input-bg);
+  color: var(--pt-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.pt-doc-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--pt-border);
+  color: var(--pt-text);
+}
+.pt-doc-table tr:hover td { background: rgba(255,255,255,0.03); }
+
+/* ── UPLOAD PAGE ── */
+.pt-upload-page {
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 24px;
+  flex: 1;
+}
+.pt-upload-page.open { display: flex; }
+.pt-upload-card {
+  background: var(--pt-surface);
+  border: 1px solid var(--pt-border);
+  border-radius: var(--pt-radius);
+  padding: 32px;
+  width: 100%;
+  max-width: 560px;
+}
+.pt-upload-card h2 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--pt-orange);
+  margin-bottom: 20px;
+}
+
+/* ── MOBILE ── */
+@media (max-width: 768px) {
+  .pt-panes {
+    grid-template-columns: 1fr;
+  }
+  .pt-pane.backtranslation-pane {
+    display: none;
+  }
+  .pt-pane.backtranslation-pane.visible {
+    display: flex;
+  }
+  .pt-header {
+    padding: 12px 16px;
+  }
+  .pt-header-center {
+    order: 3;
+    width: 100%;
+  }
+  .pt-main {
+    padding: 12px 16px;
+  }
+  .pt-admin-body {
+    flex-direction: column;
+  }
+  .pt-admin-nav {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--pt-border);
+    display: flex;
+    flex-wrap: wrap;
+    padding: 8px;
+    gap: 4px;
+  }
+  .pt-admin-nav-item {
+    border-left: none;
+    border-radius: 6px;
+    border-bottom: 2px solid transparent;
+    padding: 7px 12px;
+    flex: 0 0 auto;
+  }
+  .pt-admin-nav-item.active { border-bottom-color: var(--pt-orange); }
+  .pt-admin-content { padding: 16px; }
+  .pt-form-row { grid-template-columns: 1fr; }
+  .pt-footer { flex-direction: column; align-items: flex-start; }
+}
+
+/* ── TOGGLE ── */
+.pt-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+.pt-toggle-track {
+  width: 40px; height: 22px;
+  background: var(--pt-input-bg);
+  border: 1px solid var(--pt-border);
+  border-radius: 11px;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.pt-toggle-track.on { background: var(--pt-purple); border-color: var(--pt-purple); }
+.pt-toggle-thumb {
+  position: absolute;
+  top: 2px; left: 2px;
+  width: 16px; height: 16px;
+  background: var(--pt-muted);
+  border-radius: 50%;
+  transition: left 0.2s, background 0.2s;
+}
+.pt-toggle-track.on .pt-toggle-thumb { left: 20px; background: #fff; }
+
+/* ── LOGIN SCREEN ── */
+.pt-admin-login {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  padding: 40px;
+}
+.pt-admin-login-card {
+  background: var(--pt-surface);
+  border: 1px solid var(--pt-border);
+  border-radius: 12px;
+  padding: 32px;
+  width: 100%;
+  max-width: 380px;
+}
+.pt-admin-login-card h2 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--pt-orange);
+  margin-bottom: 20px;
+  text-align: center;
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════ HEADER -->
+<header class="pt-header">
+  <a href="/purpletongue" class="pt-logo">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Purple Tongue logo">
+      <circle cx="16" cy="16" r="15" fill="#4D148C" stroke="#FF6600" stroke-width="2"/>
+      <path d="M10 12 Q10 8 16 8 Q22 8 22 12 Q22 16 16 18 Q14 19 14 22 Q14 25 16 26" stroke="#FF6600" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+      <circle cx="16" cy="26" r="2" fill="#FF6600"/>
+    </svg>
+    <div class="pt-logo-text">
+      <span>Purple</span><span>Tongue</span>
+    </div>
+  </a>
+
+  <div class="pt-header-center">
+    <div class="pt-lang-pair">
+      <select class="pt-select" id="pt-src-lang" aria-label="Source language">
+        <option value="en-US">🇺🇸 US English</option>
+        <option value="fr-CA">🇨🇦 Canadian French</option>
+        <option value="es-419">🌎 Lat-Am Spanish</option>
+        <option value="pt-BR">🇧🇷 Brazilian Portuguese</option>
+      </select>
+      <button class="pt-swap-btn" id="pt-swap-lang" title="Swap languages" aria-label="Swap languages">⇄</button>
+      <select class="pt-select" id="pt-tgt-lang" aria-label="Target language">
+        <option value="fr-CA">🇨🇦 Canadian French</option>
+        <option value="en-US">🇺🇸 US English</option>
+        <option value="es-419">🌎 Lat-Am Spanish</option>
+        <option value="pt-BR">🇧🇷 Brazilian Portuguese</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="pt-header-right">
+    <div class="pt-ui-lang-toggle">
+      <button class="pt-ui-lang-btn active" data-lang="en">EN</button>
+      <button class="pt-ui-lang-btn" data-lang="fr">FR</button>
+    </div>
+    <div id="pt-user-bar">
+      <div id="pt-logged-out" style="display:flex;gap:8px;">
+        <button class="pt-btn-ghost" id="pt-login-btn" data-i18n="login">Login</button>
+        <button class="pt-btn" id="pt-register-btn" data-i18n="register">Register</button>
+      </div>
+      <div id="pt-logged-in" style="display:none;" class="pt-user-info">
+        <span id="pt-username"></span>
+        <button class="pt-btn-ghost" id="pt-logout-btn" style="padding:5px 10px;font-size:0.8rem;" data-i18n="logout">Logout</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════ MAIN APP -->
+<div id="pt-app-view">
+  <main class="pt-main">
+
+    <div class="pt-direction-bar">
+      <span class="lang-name" id="pt-dir-src">US English</span>
+      <span class="arrow">→</span>
+      <span class="lang-name" id="pt-dir-tgt">Canadian French</span>
+      <span style="color:var(--pt-muted);font-size:0.8rem;" data-i18n="plain_lang_mode">&nbsp;· Plain Language Mode</span>
+    </div>
+
+    <div class="pt-panes">
+
+      <!-- PANE 1: SOURCE -->
+      <div class="pt-pane">
+        <div class="pt-pane-header">
+          <span class="pt-pane-label" data-i18n="source_text">Source Text</span>
+          <button class="pt-btn-ghost" id="pt-clear-btn" style="padding:3px 10px;font-size:0.78rem;" data-i18n="clear">Clear</button>
+        </div>
+        <div class="pt-editor" id="pt-source" contenteditable="true"
+             data-placeholder="Paste or type text here… Word formatting preserved."
+             aria-label="Source text input"></div>
+        <div class="pt-pane-footer">
+          <span class="pt-char-count" id="pt-char-count">0 chars</span>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="pt-spinner" id="pt-spinner"></div>
+            <button class="pt-btn" id="pt-translate-btn" data-i18n="translate">Translate</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- PANE 2: TRANSLATION -->
+      <div class="pt-pane">
+        <div class="pt-pane-header">
+          <span class="pt-pane-label" data-i18n="translation">Plain Language Translation</span>
+          <button class="pt-btn-ghost" id="pt-copy-translation" style="padding:3px 10px;font-size:0.78rem;display:none;" data-i18n="copy">Copy</button>
+        </div>
+        <div class="pt-editor" id="pt-translation" contenteditable="false" aria-label="Translation output">
+          <span style="color:var(--pt-muted);font-style:italic;" data-i18n="translation_placeholder">Translation will appear here.</span>
+        </div>
+        <div class="pt-pane-footer" id="pt-translation-footer" style="display:none;">
+          <span class="pt-llm-tag" id="pt-translation-llm-tag"></span>
+          <button class="pt-btn-ghost" id="pt-retranslate-btn" style="padding:5px 12px;font-size:0.8rem;" data-i18n="retranslate">Retranslate</button>
+        </div>
+      </div>
+
+      <!-- PANE 3: BACKTRANSLATION -->
+      <div class="pt-pane backtranslation-pane" id="pt-backtranslation-pane">
+        <div class="pt-pane-header">
+          <span class="pt-pane-label" data-i18n="backtranslation">Backtranslation</span>
+          <button class="pt-btn-ghost" id="pt-copy-backtranslation" style="padding:3px 10px;font-size:0.78rem;display:none;" data-i18n="copy">Copy</button>
+        </div>
+        <div class="pt-editor" id="pt-backtranslation" contenteditable="false" aria-label="Backtranslation output">
+          <span style="color:var(--pt-muted);font-style:italic;" data-i18n="backtranslation_placeholder">Backtranslation appears after translation.</span>
+        </div>
+        <div class="pt-pane-footer" id="pt-backtranslation-footer" style="display:none;">
+          <span class="pt-llm-tag" id="pt-backtranslation-llm-tag"></span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="pt-footer">
+    <div class="pt-footer-left">
+      <button class="pt-btn" id="pt-doc-btn" style="font-size:0.82rem;padding:7px 14px;" data-i18n="translate_document">Translate a Document</button>
+    </div>
+    <div class="pt-footer-right">
+      <span data-i18n="privacy_note">Translations are not stored. Your data is private.</span>
+      <span>·</span>
+      <a href="#/admin" data-i18n="admin">Admin</a>
+    </div>
+  </footer>
+</div>
+
+<!-- ══════════════════════════════════════════════ UPLOAD PAGE -->
+<div id="pt-upload-view" class="pt-upload-page">
+  <div class="pt-upload-card">
+    <h2 data-i18n="document_upload">Document Translation Request</h2>
+    <div id="pt-upload-alert" class="pt-alert"></div>
+    <div class="pt-form-group">
+      <label data-i18n="upload_file_label">File (PDF, DOCX, etc.)</label>
+      <input type="file" class="pt-input" id="pt-upload-file" accept=".pdf,.docx,.doc,.txt,.odt,.xlsx,.pptx,.csv">
+    </div>
+    <div class="pt-form-row">
+      <div class="pt-form-group">
+        <label data-i18n="your_name">Your Name</label>
+        <input type="text" class="pt-input" id="pt-upload-name" placeholder="Full name">
+      </div>
+      <div class="pt-form-group">
+        <label data-i18n="your_email">Email</label>
+        <input type="email" class="pt-input" id="pt-upload-email" placeholder="email@example.com">
+      </div>
+    </div>
+    <div class="pt-form-row">
+      <div class="pt-form-group">
+        <label data-i18n="source_language">Source Language</label>
+        <select class="pt-input" id="pt-upload-src">
+          <option value="en-US">US English</option>
+          <option value="fr-CA">Canadian French</option>
+          <option value="es-419">Latin-Am Spanish</option>
+          <option value="pt-BR">Brazilian Portuguese</option>
+        </select>
+      </div>
+      <div class="pt-form-group">
+        <label data-i18n="target_language">Target Language</label>
+        <select class="pt-input" id="pt-upload-tgt">
+          <option value="fr-CA">Canadian French</option>
+          <option value="en-US">US English</option>
+          <option value="es-419">Latin-Am Spanish</option>
+          <option value="pt-BR">Brazilian Portuguese</option>
+        </select>
+      </div>
+    </div>
+    <div class="pt-form-group">
+      <label data-i18n="notes">Notes (optional)</label>
+      <textarea class="pt-input" id="pt-upload-notes" rows="3" placeholder="Any special instructions…" style="resize:vertical;"></textarea>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="pt-btn" id="pt-upload-submit" data-i18n="submit_request">Submit Request</button>
+      <button class="pt-btn-ghost" id="pt-upload-back" data-i18n="back">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ LOGIN MODAL -->
+<div class="pt-overlay" id="pt-login-overlay">
+  <div class="pt-modal">
+    <button class="pt-modal-close" id="pt-login-close">✕</button>
+    <div class="pt-modal-title" data-i18n="login">Login</div>
+    <div id="pt-login-alert" class="pt-alert"></div>
+    <div class="pt-form-group">
+      <label data-i18n="email">Email</label>
+      <input type="email" class="pt-input" id="pt-login-email" placeholder="email@example.com" autocomplete="email">
+    </div>
+    <div class="pt-form-group">
+      <label data-i18n="password">Password</label>
+      <input type="password" class="pt-input" id="pt-login-password" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="pt-btn" id="pt-login-submit" data-i18n="login">Login</button>
+    <p style="font-size:0.8rem;color:var(--pt-muted);text-align:center;">
+      <a href="#" id="pt-forgot-link" data-i18n="forgot_password">Forgot password?</a>
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ REGISTER MODAL -->
+<div class="pt-overlay" id="pt-register-overlay">
+  <div class="pt-modal">
+    <button class="pt-modal-close" id="pt-register-close">✕</button>
+    <div class="pt-modal-title" data-i18n="register">Create Account</div>
+    <div id="pt-register-alert" class="pt-alert"></div>
+    <div class="pt-form-group">
+      <label data-i18n="email">Email</label>
+      <input type="email" class="pt-input" id="pt-reg-email" placeholder="email@example.com" autocomplete="email">
+    </div>
+    <div class="pt-form-group">
+      <label data-i18n="password">Password</label>
+      <input type="password" class="pt-input" id="pt-reg-password" placeholder="Min. 6 characters" autocomplete="new-password">
+    </div>
+    <button class="pt-btn" id="pt-register-submit" data-i18n="register">Create Account</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════ ADMIN PANEL -->
+<div class="pt-admin" id="pt-admin">
+
+  <!-- Admin Login Screen -->
+  <div id="pt-admin-login-screen" style="flex:1;display:flex;flex-direction:column;">
+    <div class="pt-admin-header">
+      <h1>Purple Tongue Admin</h1>
+      <button class="pt-btn-ghost" id="pt-admin-close">✕ Close</button>
+    </div>
+    <div class="pt-admin-login">
+      <div class="pt-admin-login-card">
+        <h2>Admin Login</h2>
+        <div id="pt-admin-login-alert" class="pt-alert"></div>
+        <div class="pt-form-group">
+          <label>Username</label>
+          <input type="text" class="pt-input" id="pt-admin-username" placeholder="admin" autocomplete="username">
+        </div>
+        <div class="pt-form-group">
+          <label>Password</label>
+          <input type="password" class="pt-input" id="pt-admin-password" placeholder="••••••••" autocomplete="current-password">
+        </div>
+        <button class="pt-btn" id="pt-admin-login-submit" style="width:100%;">Login</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div id="pt-admin-dashboard" style="display:none;flex:1;flex-direction:column;">
+    <div class="pt-admin-header">
+      <h1>Purple Tongue Admin</h1>
+      <div style="display:flex;gap:10px;">
+        <button class="pt-btn-ghost" id="pt-admin-logout">Logout</button>
+        <button class="pt-btn-ghost" id="pt-admin-close2">✕ Close</button>
+      </div>
+    </div>
+    <div class="pt-admin-body">
+      <nav class="pt-admin-nav" id="pt-admin-nav">
+        <button class="pt-admin-nav-item active" data-section="llm">Translation LLM</button>
+        <button class="pt-admin-nav-item" data-section="backtranslation-llm">Backtranslation LLM</button>
+        <button class="pt-admin-nav-item" data-section="resources">Translation Resources</button>
+        <button class="pt-admin-nav-item" data-section="documents">Document Queue</button>
+        <button class="pt-admin-nav-item" data-section="doc-mode">Document Mode</button>
+        <button class="pt-admin-nav-item" data-section="members">Members</button>
+        <button class="pt-admin-nav-item" data-section="stripe">Stripe & Billing</button>
+        <button class="pt-admin-nav-item" data-section="db">MySQL Database</button>
+        <button class="pt-admin-nav-item" data-section="smtp">Email / SMTP</button>
+        <button class="pt-admin-nav-item" data-section="credentials">Admin Credentials</button>
+      </nav>
+
+      <div class="pt-admin-content">
+
+        <!-- LLM Config -->
+        <div class="pt-admin-section active" id="pt-section-llm">
+          <h2>Translation LLM Configuration</h2>
+          <div id="pt-llm-alert" class="pt-alert"></div>
+          <div class="pt-form-group">
+            <label>Provider Type</label>
+            <select class="pt-input" id="pt-llm-provider">
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai-compatible">OpenAI Compatible</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="groq">Groq</option>
+            </select>
+          </div>
+          <div class="pt-form-group">
+            <label>API Endpoint</label>
+            <input type="url" class="pt-input" id="pt-llm-endpoint" placeholder="https://api.anthropic.com/v1/messages">
+          </div>
+          <div class="pt-form-group">
+            <label>API Key</label>
+            <input type="password" class="pt-input" id="pt-llm-key" placeholder="sk-ant-api03-…">
+          </div>
+          <div class="pt-form-group">
+            <label>Model</label>
+            <input type="text" class="pt-input" id="pt-llm-model" placeholder="claude-sonnet-4-6-20260205">
+          </div>
+          <div class="pt-form-group">
+            <label>Temperature (0–1)</label>
+            <input type="number" class="pt-input" id="pt-llm-temp" min="0" max="1" step="0.05" value="0.3">
+          </div>
+          <button class="pt-btn" id="pt-llm-save">Save Translation LLM</button>
+        </div>
+
+        <!-- Backtranslation LLM Config -->
+        <div class="pt-admin-section" id="pt-section-backtranslation-llm">
+          <h2>Backtranslation LLM Configuration</h2>
+          <p style="font-size:0.85rem;color:var(--pt-muted);margin-bottom:16px;">Used for backtranslating the result back to the source language. If left blank, falls back to the Translation LLM.</p>
+          <div id="pt-bllm-alert" class="pt-alert"></div>
+          <div class="pt-form-group">
+            <label>Provider Type</label>
+            <select class="pt-input" id="pt-bllm-provider">
+              <option value="">(same as Translation LLM)</option>
+              <option value="anthropic">Anthropic (Claude)</option>
+              <option value="openai-compatible">OpenAI Compatible</option>
+              <option value="openrouter">OpenRouter</option>
+              <option value="groq">Groq</option>
+            </select>
+          </div>
+          <div class="pt-form-group">
+            <label>API Endpoint</label>
+            <input type="url" class="pt-input" id="pt-bllm-endpoint" placeholder="(same as Translation LLM)">
+          </div>
+          <div class="pt-form-group">
+            <label>API Key</label>
+            <input type="password" class="pt-input" id="pt-bllm-key" placeholder="(same as Translation LLM)">
+          </div>
+          <div class="pt-form-group">
+            <label>Model</label>
+            <input type="text" class="pt-input" id="pt-bllm-model" placeholder="(same as Translation LLM)">
+          </div>
+          <div class="pt-form-group">
+            <label>Temperature (0–1)</label>
+            <input type="number" class="pt-input" id="pt-bllm-temp" min="0" max="1" step="0.05" value="0.3">
+          </div>
+          <button class="pt-btn" id="pt-bllm-save">Save Backtranslation LLM</button>
+        </div>
+
+        <!-- Resources -->
+        <div class="pt-admin-section" id="pt-section-resources">
+          <h2>Translation Resources</h2>
+          <div id="pt-res-alert" class="pt-alert"></div>
+          <div class="pt-subsection">
+            <h3>Quadrilingual Glossary</h3>
+            <p style="font-size:0.82rem;color:var(--pt-muted);margin-bottom:12px;">CSV with 4 columns: <code style="background:rgba(0,0,0,0.3);padding:1px 5px;border-radius:3px;">en-US,fr-CA,es-419,pt-BR</code></p>
+            <div class="pt-form-group">
+              <input type="file" class="pt-input" id="pt-glossary-file" accept=".csv">
+            </div>
+            <button class="pt-btn" id="pt-glossary-upload">Upload Glossary</button>
+          </div>
+          <div class="pt-subsection">
+            <h3>Translation Memory (TMX)</h3>
+            <p style="font-size:0.82rem;color:var(--pt-muted);margin-bottom:12px;">TMX file with TUVs for en-US, fr-CA, es-419, pt-BR</p>
+            <div class="pt-form-group">
+              <input type="file" class="pt-input" id="pt-tmx-file" accept=".tmx,.xml">
+            </div>
+            <button class="pt-btn" id="pt-tmx-upload">Upload TMX</button>
+          </div>
+        </div>
+
+        <!-- Documents -->
+        <div class="pt-admin-section" id="pt-section-documents">
+          <h2>Document Queue</h2>
+          <div id="pt-docs-alert" class="pt-alert"></div>
+          <button class="pt-btn-ghost" id="pt-docs-refresh" style="margin-bottom:14px;">Refresh</button>
+          <div id="pt-docs-table-wrap">
+            <p style="color:var(--pt-muted);font-size:0.875rem;">Loading…</p>
+          </div>
+        </div>
+
+        <!-- Document Mode -->
+        <div class="pt-admin-section" id="pt-section-doc-mode">
+          <h2>Document Translation Mode</h2>
+          <div id="pt-docmode-alert" class="pt-alert"></div>
+          <p style="font-size:0.85rem;color:var(--pt-muted);margin-bottom:20px;">Controls what happens when a user clicks "Translate a Document".</p>
+          <div class="pt-form-group">
+            <label>Mode</label>
+            <select class="pt-input" id="pt-docmode-select">
+              <option value="email">Send email to contact address</option>
+              <option value="upload">Show upload form</option>
+            </select>
+          </div>
+          <div class="pt-form-group" id="pt-docmode-email-group">
+            <label>Contact Email Address</label>
+            <input type="email" class="pt-input" id="pt-docmode-email" placeholder="translations@yourcompany.com">
+          </div>
+          <button class="pt-btn" id="pt-docmode-save">Save</button>
+        </div>
+
+        <!-- Members -->
+        <div class="pt-admin-section" id="pt-section-members">
+          <h2>Members</h2>
+          <div id="pt-members-alert" class="pt-alert"></div>
+          <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+            <button class="pt-btn" id="pt-member-create-btn">+ Create Account</button>
+            <button class="pt-btn-ghost" id="pt-member-import-btn">Import CSV</button>
+          </div>
+          <div id="pt-member-create-form" style="display:none;background:rgba(0,0,0,0.2);border:1px solid var(--pt-border);border-radius:8px;padding:16px;margin-bottom:16px;">
+            <div class="pt-form-row">
+              <div class="pt-form-group">
+                <label>Email</label>
+                <input type="email" class="pt-input" id="pt-new-member-email" placeholder="user@example.com">
+              </div>
+              <div class="pt-form-group">
+                <label>Password</label>
+                <input type="password" class="pt-input" id="pt-new-member-password" placeholder="Min 6 chars">
+              </div>
+            </div>
+            <button class="pt-btn" id="pt-new-member-submit">Create</button>
+          </div>
+          <input type="file" id="pt-import-csv-file" accept=".csv" style="display:none;">
+          <div id="pt-members-list"></div>
+        </div>
+
+        <!-- Stripe -->
+        <div class="pt-admin-section" id="pt-section-stripe">
+          <h2>Stripe & Billing</h2>
+          <div id="pt-stripe-alert" class="pt-alert"></div>
+          <div class="pt-form-group">
+            <label>Stripe Publishable Key</label>
+            <input type="text" class="pt-input" id="pt-stripe-pub" placeholder="pk_live_…">
+          </div>
+          <div class="pt-form-group">
+            <label>Stripe Secret Key</label>
+            <input type="password" class="pt-input" id="pt-stripe-secret" placeholder="sk_live_…">
+          </div>
+          <div class="pt-form-group">
+            <label>Stripe Price ID</label>
+            <input type="text" class="pt-input" id="pt-stripe-price" placeholder="price_…">
+          </div>
+          <div class="pt-form-group">
+            <label>Webhook Secret</label>
+            <input type="password" class="pt-input" id="pt-stripe-webhook" placeholder="whsec_…">
+          </div>
+          <button class="pt-btn" id="pt-stripe-save">Save Stripe Config</button>
+        </div>
+
+        <!-- DB -->
+        <div class="pt-admin-section" id="pt-section-db">
+          <h2>MySQL Database</h2>
+          <div id="pt-db-alert" class="pt-alert"></div>
+          <div class="pt-form-row">
+            <div class="pt-form-group">
+              <label>Host</label>
+              <input type="text" class="pt-input" id="pt-db-host" placeholder="localhost">
+            </div>
+            <div class="pt-form-group">
+              <label>Port</label>
+              <input type="number" class="pt-input" id="pt-db-port" placeholder="3306">
+            </div>
+          </div>
+          <div class="pt-form-group">
+            <label>Database Name</label>
+            <input type="text" class="pt-input" id="pt-db-name" placeholder="textappeal">
+          </div>
+          <div class="pt-form-row">
+            <div class="pt-form-group">
+              <label>Username</label>
+              <input type="text" class="pt-input" id="pt-db-user" placeholder="root">
+            </div>
+            <div class="pt-form-group">
+              <label>Password</label>
+              <input type="password" class="pt-input" id="pt-db-pass" placeholder="••••••••">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="pt-btn" id="pt-db-save">Save DB Config</button>
+            <button class="pt-btn-ghost" id="pt-db-init">Initialize Tables</button>
+          </div>
+        </div>
+
+        <!-- SMTP -->
+        <div class="pt-admin-section" id="pt-section-smtp">
+          <h2>Email / SMTP</h2>
+          <div id="pt-smtp-alert" class="pt-alert"></div>
+          <div class="pt-form-group">
+            <label>SMTP Host</label>
+            <input type="text" class="pt-input" id="pt-smtp-host" placeholder="smtp.example.com">
+          </div>
+          <div class="pt-form-row">
+            <div class="pt-form-group">
+              <label>Port</label>
+              <input type="number" class="pt-input" id="pt-smtp-port" placeholder="587">
+            </div>
+            <div class="pt-form-group">
+              <label>From Address</label>
+              <input type="email" class="pt-input" id="pt-smtp-from" placeholder="noreply@example.com">
+            </div>
+          </div>
+          <div class="pt-form-row">
+            <div class="pt-form-group">
+              <label>Username</label>
+              <input type="text" class="pt-input" id="pt-smtp-user" placeholder="SMTP username">
+            </div>
+            <div class="pt-form-group">
+              <label>Password</label>
+              <input type="password" class="pt-input" id="pt-smtp-pass" placeholder="SMTP password">
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button class="pt-btn" id="pt-smtp-save">Save SMTP Config</button>
+            <button class="pt-btn-ghost" id="pt-smtp-test">Send Test Email</button>
+          </div>
+        </div>
+
+        <!-- Admin Credentials -->
+        <div class="pt-admin-section" id="pt-section-credentials">
+          <h2>Admin Credentials</h2>
+          <div id="pt-cred-alert" class="pt-alert"></div>
+          <div class="pt-form-group">
+            <label>Username</label>
+            <input type="text" class="pt-input" id="pt-cred-username" placeholder="admin">
+          </div>
+          <div class="pt-form-group">
+            <label>New Password</label>
+            <input type="password" class="pt-input" id="pt-cred-password" placeholder="Min 6 characters">
+          </div>
+          <div class="pt-form-group">
+            <label>Confirm Password</label>
+            <input type="password" class="pt-input" id="pt-cred-confirm" placeholder="Repeat password">
+          </div>
+          <button class="pt-btn" id="pt-cred-save">Update Credentials</button>
+        </div>
+
+      </div><!-- /pt-admin-content -->
+    </div><!-- /pt-admin-body -->
+  </div><!-- /pt-admin-dashboard -->
+</div><!-- /pt-admin -->
+
+<script>
+(function() {
+'use strict';
+
+// ── i18n ──────────────────────────────────────────────────────────────────
+var _uiLang = 'en';
+var _i18n = {
+  en: {
+    source_text: 'Source Text',
+    translation: 'Plain Language Translation',
+    backtranslation: 'Backtranslation',
+    translate: 'Translate',
+    retranslate: 'Retranslate',
+    clear: 'Clear',
+    copy: 'Copy',
+    login: 'Login',
+    register: 'Register',
+    logout: 'Logout',
+    email: 'Email',
+    password: 'Password',
+    forgot_password: 'Forgot password?',
+    admin: 'Admin',
+    translate_document: 'Translate a Document',
+    privacy_note: 'Translations are not stored. Your data is private.',
+    plain_lang_mode: '· Plain Language Mode',
+    translation_placeholder: 'Translation will appear here.',
+    backtranslation_placeholder: 'Backtranslation appears after translation.',
+    document_upload: 'Document Translation Request',
+    upload_file_label: 'File (PDF, DOCX, etc.)',
+    your_name: 'Your Name',
+    your_email: 'Email',
+    source_language: 'Source Language',
+    target_language: 'Target Language',
+    notes: 'Notes (optional)',
+    submit_request: 'Submit Request',
+    back: '← Back'
+  },
+  fr: {
+    source_text: 'Texte source',
+    translation: 'Traduction en langage clair',
+    backtranslation: 'Rétrotraduction',
+    translate: 'Traduire',
+    retranslate: 'Retraduire',
+    clear: 'Effacer',
+    copy: 'Copier',
+    login: 'Connexion',
+    register: 'S\'inscrire',
+    logout: 'Déconnexion',
+    email: 'Courriel',
+    password: 'Mot de passe',
+    forgot_password: 'Mot de passe oublié?',
+    admin: 'Admin',
+    translate_document: 'Traduire un document',
+    privacy_note: 'Les traductions ne sont pas conservées. Vos données sont privées.',
+    plain_lang_mode: '· Mode langage clair',
+    translation_placeholder: 'La traduction apparaîtra ici.',
+    backtranslation_placeholder: 'La rétrotraduction apparaît après la traduction.',
+    document_upload: 'Demande de traduction de document',
+    upload_file_label: 'Fichier (PDF, DOCX, etc.)',
+    your_name: 'Votre nom',
+    your_email: 'Courriel',
+    source_language: 'Langue source',
+    target_language: 'Langue cible',
+    notes: 'Notes (facultatif)',
+    submit_request: 'Envoyer la demande',
+    back: '← Retour'
+  }
+};
+
+function _t(key) {
+  return (_i18n[_uiLang] || _i18n.en)[key] || (_i18n.en[key] || key);
+}
+
+function _applyI18n() {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    var key = el.getAttribute('data-i18n');
+    el.textContent = _t(key);
+  });
+  document.querySelectorAll('[data-placeholder-i18n]').forEach(function(el) {
+    el.setAttribute('data-placeholder', _t(el.getAttribute('data-placeholder-i18n')));
+  });
+  document.title = 'Purple Tongue — ' + (_uiLang === 'fr' ? 'Traduction Quadrilingue' : 'Quadrilingual Translation');
+}
+
+// ── Language names ─────────────────────────────────────────────────────────
+var _langNames = {
+  'en-US': { en: 'US English', fr: 'anglais américain' },
+  'fr-CA': { en: 'Canadian French', fr: 'français canadien' },
+  'es-419': { en: 'Latin-Am Spanish', fr: 'espagnol latino-américain' },
+  'pt-BR': { en: 'Brazilian Portuguese', fr: 'portugais brésilien' }
+};
+function _langName(code) {
+  return (_langNames[code] || {})[_uiLang] || code;
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+var _srcLang = 'en-US';
+var _tgtLang = 'fr-CA';
+var _userToken = localStorage.getItem('pt_user_token') || null;
+var _adminToken = localStorage.getItem('pt_admin_token') || null;
+var _translationLlmTag = '';
+var _backtranslationLlmTag = '';
+var _docMode = 'email';
+var _docEmail = '';
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function _qs(sel) { return document.querySelector(sel); }
+function _qsa(sel) { return document.querySelectorAll(sel); }
+
+function _showAlert(el, msg, type) {
+  el.textContent = msg;
+  el.className = 'pt-alert ' + (type || 'error');
+}
+
+function _apiBase() { return '/purpletongue/api'; }
+
+async function _api(path, opts) {
+  opts = opts || {};
+  var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+  if (_adminToken) headers['x-admin-token'] = _adminToken;
+  if (_userToken) headers['x-user-token'] = _userToken;
+  var r = await fetch(_apiBase() + path, Object.assign({}, opts, { headers: headers }));
+  var data;
+  try { data = await r.json(); } catch(e) { data = {}; }
+  return { ok: r.ok, status: r.status, data: data };
+}
+
+async function _apiAdmin(path, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ 'x-admin-token': _adminToken }, opts.headers || {});
+  return _api(path, opts);
+}
+
+// ── Copy to clipboard ──────────────────────────────────────────────────────
+function _copyText(text) {
+  if (navigator.clipboard) { navigator.clipboard.writeText(text).catch(function(){}); }
+  else {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+  }
+}
+
+// ── Direction bar ──────────────────────────────────────────────────────────
+function _updateDirectionBar() {
+  _qs('#pt-dir-src').textContent = _langName(_srcLang);
+  _qs('#pt-dir-tgt').textContent = _langName(_tgtLang);
+}
+
+// ── Language selects ───────────────────────────────────────────────────────
+var _srcSelect = _qs('#pt-src-lang');
+var _tgtSelect = _qs('#pt-tgt-lang');
+
+_srcSelect.value = _srcLang;
+_tgtSelect.value = _tgtLang;
+
+_srcSelect.addEventListener('change', function() {
+  _srcLang = this.value;
+  if (_srcLang === _tgtLang) {
+    _tgtLang = _srcLang === 'en-US' ? 'fr-CA' : 'en-US';
+    _tgtSelect.value = _tgtLang;
+  }
+  _updateDirectionBar();
+});
+
+_tgtSelect.addEventListener('change', function() {
+  _tgtLang = this.value;
+  if (_tgtLang === _srcLang) {
+    _srcLang = _tgtLang === 'en-US' ? 'fr-CA' : 'en-US';
+    _srcSelect.value = _srcLang;
+  }
+  _updateDirectionBar();
+});
+
+_qs('#pt-swap-lang').addEventListener('click', function() {
+  var tmp = _srcLang;
+  _srcLang = _tgtLang;
+  _tgtLang = tmp;
+  _srcSelect.value = _srcLang;
+  _tgtSelect.value = _tgtLang;
+  _updateDirectionBar();
+  // Swap content
+  var srcEl = _qs('#pt-source');
+  var tgtEl = _qs('#pt-translation');
+  var srcHtml = srcEl.innerHTML;
+  var tgtHtml = tgtEl.innerHTML;
+  srcEl.innerHTML = tgtHtml;
+  tgtEl.innerHTML = '';
+  _qs('#pt-backtranslation').innerHTML = '';
+  _qs('#pt-translation-footer').style.display = 'none';
+  _qs('#pt-backtranslation-footer').style.display = 'none';
+  _qs('#pt-copy-translation').style.display = 'none';
+  _qs('#pt-copy-backtranslation').style.display = 'none';
+});
+
+// ── Character count ───────────────────────────────────────────────────────
+var _sourceEl = _qs('#pt-source');
+_sourceEl.addEventListener('input', function() {
+  var txt = _sourceEl.textContent || '';
+  _qs('#pt-char-count').textContent = txt.length + ' chars';
+});
+
+// ── Clear button ─────────────────────────────────────────────────────────
+_qs('#pt-clear-btn').addEventListener('click', function() {
+  _sourceEl.innerHTML = '';
+  _qs('#pt-translation').innerHTML = '<span style="color:var(--pt-muted);font-style:italic;">' + _t('translation_placeholder') + '</span>';
+  _qs('#pt-backtranslation').innerHTML = '<span style="color:var(--pt-muted);font-style:italic;">' + _t('backtranslation_placeholder') + '</span>';
+  _qs('#pt-translation-footer').style.display = 'none';
+  _qs('#pt-backtranslation-footer').style.display = 'none';
+  _qs('#pt-copy-translation').style.display = 'none';
+  _qs('#pt-copy-backtranslation').style.display = 'none';
+  _qs('#pt-char-count').textContent = '0 chars';
+  // mobile: hide backtranslation pane
+  _qs('#pt-backtranslation-pane').classList.remove('visible');
+});
+
+// ── Word-paste handler (preserve formatting) ──────────────────────────────
+_sourceEl.addEventListener('paste', function(e) {
+  e.preventDefault();
+  var cd = e.clipboardData || window.clipboardData;
+  var html = cd.getData('text/html');
+  if (html) {
+    // Clean up Word-specific cruft but keep semantic tags
+    html = html.replace(/<o:[^>]*>[\s\S]*?<\/o:[^>]*>/gi, '');
+    html = html.replace(/<w:[^>]*>[\s\S]*?<\/w:[^>]*>/gi, '');
+    html = html.replace(/<!--[\s\S]*?-->/g, '');
+    html = html.replace(/<span[^>]*style="[^"]*mso-[^"]*"[^>]*>([\s\S]*?)<\/span>/gi, '$1');
+    // Keep b, i, u, em, strong, h1-h6, ul, ol, li, p, br
+    document.execCommand('insertHTML', false, html);
+  } else {
+    var text = cd.getData('text/plain') || '';
+    document.execCommand('insertText', false, text);
+  }
+});
+
+// ── Translation ────────────────────────────────────────────────────────────
+var _isTranslating = false;
+
+async function _doTranslate(retranslate) {
+  if (_isTranslating) return;
+  var text = (_sourceEl.textContent || '').trim();
+  if (!text) { alert('Please enter text to translate.'); return; }
+
+  _isTranslating = true;
+  _qs('#pt-translate-btn').disabled = true;
+  _qs('#pt-spinner').classList.add('active');
+
+  // Reset outputs
+  _qs('#pt-translation').textContent = '';
+  _qs('#pt-backtranslation').textContent = '';
+  _qs('#pt-translation-footer').style.display = 'none';
+  _qs('#pt-backtranslation-footer').style.display = 'none';
+  _qs('#pt-copy-translation').style.display = 'none';
+  _qs('#pt-copy-backtranslation').style.display = 'none';
+
+  try {
+    var endpoint = retranslate ? '/retranslate' : '/translate';
+    var r = await _api(endpoint, {
+      method: 'POST',
+      body: JSON.stringify({ text: text, sourceLang: _srcLang, targetLang: _tgtLang })
+    });
+
+    if (!r.ok) {
+      var errMsg = (r.data && r.data.error) ? r.data.error : 'Translation failed. Check LLM configuration.';
+      _qs('#pt-translation').innerHTML = '<span style="color:var(--pt-error);">' + _esc(errMsg) + '</span>';
+    } else {
+      var d = r.data;
+      _qs('#pt-translation').textContent = d.translation || '';
+      _qs('#pt-copy-translation').style.display = 'inline-block';
+
+      if (d.backtranslation) {
+        _qs('#pt-backtranslation').textContent = d.backtranslation;
+        _qs('#pt-copy-backtranslation').style.display = 'inline-block';
+        _qs('#pt-backtranslation-footer').style.display = 'flex';
+        // Show on mobile
+        _qs('#pt-backtranslation-pane').classList.add('visible');
+      }
+
+      var llmTag = d.translationLlm ? 'via ' + d.translationLlm : '';
+      _qs('#pt-translation-llm-tag').textContent = llmTag;
+      var bllmTag = d.backtranslationLlm ? 'via ' + d.backtranslationLlm : '';
+      _qs('#pt-backtranslation-llm-tag').textContent = bllmTag;
+
+      _qs('#pt-translation-footer').style.display = 'flex';
+      _qs('#pt-retranslate-btn').style.display = 'inline-block';
+    }
+  } catch(e) {
+    _qs('#pt-translation').innerHTML = '<span style="color:var(--pt-error);">Network error: ' + _esc(e.message) + '</span>';
+  }
+
+  _isTranslating = false;
+  _qs('#pt-translate-btn').disabled = false;
+  _qs('#pt-spinner').classList.remove('active');
+}
+
+function _esc(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+_qs('#pt-translate-btn').addEventListener('click', function() { _doTranslate(false); });
+_qs('#pt-retranslate-btn').addEventListener('click', function() { _doTranslate(true); });
+
+// Ctrl+Enter shortcut
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    if (document.activeElement === _sourceEl || _sourceEl.contains(document.activeElement)) {
+      _doTranslate(false);
+    }
+  }
+});
+
+// ── Copy buttons ───────────────────────────────────────────────────────────
+_qs('#pt-copy-translation').addEventListener('click', function() {
+  _copyText(_qs('#pt-translation').textContent || '');
+  this.textContent = '✓';
+  var btn = this; setTimeout(function(){ btn.textContent = _t('copy'); }, 1500);
+});
+_qs('#pt-copy-backtranslation').addEventListener('click', function() {
+  _copyText(_qs('#pt-backtranslation').textContent || '');
+  this.textContent = '✓';
+  var btn = this; setTimeout(function(){ btn.textContent = _t('copy'); }, 1500);
+});
+
+// ── UI Language toggle ─────────────────────────────────────────────────────
+_qsa('.pt-ui-lang-btn').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    _uiLang = this.getAttribute('data-lang');
+    _qsa('.pt-ui-lang-btn').forEach(function(b) { b.classList.remove('active'); });
+    this.classList.add('active');
+    _applyI18n();
+    _updateDirectionBar();
+  });
+});
+
+// ── User Auth ──────────────────────────────────────────────────────────────
+function _updateUserBar() {
+  if (_userToken) {
+    var user = JSON.parse(localStorage.getItem('pt_user_info') || '{}');
+    _qs('#pt-logged-out').style.display = 'none';
+    _qs('#pt-logged-in').style.display = 'flex';
+    _qs('#pt-username').textContent = user.email || 'User';
+  } else {
+    _qs('#pt-logged-out').style.display = 'flex';
+    _qs('#pt-logged-in').style.display = 'none';
+  }
+}
+
+// Login modal
+_qs('#pt-login-btn').addEventListener('click', function() {
+  _qs('#pt-login-overlay').classList.add('open');
+  _qs('#pt-login-email').focus();
+});
+_qs('#pt-login-close').addEventListener('click', function() {
+  _qs('#pt-login-overlay').classList.remove('open');
+});
+_qs('#pt-login-overlay').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+_qs('#pt-login-submit').addEventListener('click', async function() {
+  var email = _qs('#pt-login-email').value.trim();
+  var pass = _qs('#pt-login-password').value;
+  if (!email || !pass) { _showAlert(_qs('#pt-login-alert'), 'Email and password required.', 'error'); return; }
+  var r = await _api('/user/login', { method: 'POST', body: JSON.stringify({ email: email, password: pass }) });
+  if (r.ok && r.data.token) {
+    _userToken = r.data.token;
+    localStorage.setItem('pt_user_token', _userToken);
+    localStorage.setItem('pt_user_info', JSON.stringify({ email: email }));
+    _updateUserBar();
+    _qs('#pt-login-overlay').classList.remove('open');
+    _qs('#pt-login-email').value = '';
+    _qs('#pt-login-password').value = '';
+  } else {
+    _showAlert(_qs('#pt-login-alert'), (r.data && r.data.error) || 'Login failed.', 'error');
+  }
+});
+
+// Register modal
+_qs('#pt-register-btn').addEventListener('click', function() {
+  _qs('#pt-register-overlay').classList.add('open');
+  _qs('#pt-reg-email').focus();
+});
+_qs('#pt-register-close').addEventListener('click', function() {
+  _qs('#pt-register-overlay').classList.remove('open');
+});
+_qs('#pt-register-overlay').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('open');
+});
+
+_qs('#pt-register-submit').addEventListener('click', async function() {
+  var email = _qs('#pt-reg-email').value.trim();
+  var pass = _qs('#pt-reg-password').value;
+  if (!email || !pass) { _showAlert(_qs('#pt-register-alert'), 'Email and password required.', 'error'); return; }
+  if (pass.length < 6) { _showAlert(_qs('#pt-register-alert'), 'Password must be at least 6 characters.', 'error'); return; }
+  var r = await _api('/user/register', { method: 'POST', body: JSON.stringify({ email: email, password: pass }) });
+  if (r.ok) {
+    _showAlert(_qs('#pt-register-alert'), 'Account created! Please login.', 'success');
+    setTimeout(function() { _qs('#pt-register-overlay').classList.remove('open'); }, 1500);
+  } else {
+    _showAlert(_qs('#pt-register-alert'), (r.data && r.data.error) || 'Registration failed.', 'error');
+  }
+});
+
+// Logout
+_qs('#pt-logout-btn').addEventListener('click', async function() {
+  await _api('/user/logout', { method: 'POST' });
+  _userToken = null;
+  localStorage.removeItem('pt_user_token');
+  localStorage.removeItem('pt_user_info');
+  _updateUserBar();
+});
+
+// ── Document button ────────────────────────────────────────────────────────
+_qs('#pt-doc-btn').addEventListener('click', function() {
+  if (_docMode === 'upload') {
+    _showView('upload');
+  } else {
+    var email = _docEmail || 'contact@example.com';
+    window.location.href = 'mailto:' + email + '?subject=Document+Translation+Request';
+  }
+});
+
+// ── View routing ───────────────────────────────────────────────────────────
+function _showView(view) {
+  _qs('#pt-app-view').style.display = (view === 'app') ? 'flex' : 'none';
+  _qs('#pt-upload-view').classList.toggle('open', view === 'upload');
+  _qs('#pt-app-view').style.flexDirection = 'column';
+  if (view === 'app') _qs('#pt-app-view').style.display = 'flex';
+}
+
+function _showAdmin() {
+  _qs('#pt-admin').classList.add('open');
+  if (_adminToken) {
+    _showAdminDashboard();
+  } else {
+    _qs('#pt-admin-login-screen').style.display = 'flex';
+    _qs('#pt-admin-dashboard').style.display = 'none';
+    _qs('#pt-admin-username').focus();
+  }
+}
+
+function _hideAdmin() {
+  _qs('#pt-admin').classList.remove('open');
+  window.history.replaceState(null, '', '/purpletongue');
+}
+
+// ── Hash routing ───────────────────────────────────────────────────────────
+function _handleHash() {
+  var hash = window.location.hash;
+  if (hash === '#/admin') {
+    _showView('app');
+    _showAdmin();
+  } else if (hash === '#/upload') {
+    _showAdmin() ; // close admin if open
+    _qs('#pt-admin').classList.remove('open');
+    _showView('upload');
+  } else {
+    _qs('#pt-admin').classList.remove('open');
+    _showView('app');
+  }
+}
+window.addEventListener('hashchange', _handleHash);
+_handleHash();
+
+// ── Admin close ────────────────────────────────────────────────────────────
+_qs('#pt-admin-close').addEventListener('click', _hideAdmin);
+_qs('#pt-admin-close2').addEventListener('click', _hideAdmin);
+
+// ── Admin login ────────────────────────────────────────────────────────────
+_qs('#pt-admin-login-submit').addEventListener('click', async function() {
+  var user = _qs('#pt-admin-username').value.trim();
+  var pass = _qs('#pt-admin-password').value;
+  if (!user || !pass) { _showAlert(_qs('#pt-admin-login-alert'), 'Username and password required.', 'error'); return; }
+  var r = await fetch(_apiBase() + '/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: user, password: pass })
+  });
+  var data = await r.json();
+  if (r.ok && data.token) {
+    _adminToken = data.token;
+    localStorage.setItem('pt_admin_token', _adminToken);
+    _showAdminDashboard();
+    _loadAdminData();
+  } else {
+    _showAlert(_qs('#pt-admin-login-alert'), data.error || 'Login failed.', 'error');
+  }
+});
+
+_qs('#pt-admin-username').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') _qs('#pt-admin-login-submit').click();
+});
+_qs('#pt-admin-password').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') _qs('#pt-admin-login-submit').click();
+});
+
+// ── Admin logout ───────────────────────────────────────────────────────────
+_qs('#pt-admin-logout').addEventListener('click', function() {
+  _adminToken = null;
+  localStorage.removeItem('pt_admin_token');
+  _qs('#pt-admin-login-screen').style.display = 'flex';
+  _qs('#pt-admin-dashboard').style.display = 'none';
+});
+
+function _showAdminDashboard() {
+  _qs('#pt-admin-login-screen').style.display = 'none';
+  _qs('#pt-admin-dashboard').style.display = 'flex';
+}
+
+// ── Admin nav ──────────────────────────────────────────────────────────────
+_qsa('#pt-admin-nav .pt-admin-nav-item').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    _qsa('#pt-admin-nav .pt-admin-nav-item').forEach(function(b) { b.classList.remove('active'); });
+    this.classList.add('active');
+    var sec = this.getAttribute('data-section');
+    _qsa('.pt-admin-section').forEach(function(s) { s.classList.remove('active'); });
+    var secEl = _qs('#pt-section-' + sec);
+    if (secEl) secEl.classList.add('active');
+    if (sec === 'documents') _loadDocuments();
+    if (sec === 'members') _loadMembers();
+  });
+});
+
+// ── Load admin data ────────────────────────────────────────────────────────
+async function _loadAdminData() {
+  // LLM config
+  var r = await _apiAdmin('/admin/llm');
+  if (r.ok && r.data) {
+    var d = r.data;
+    _qs('#pt-llm-provider').value = d.providerType || 'anthropic';
+    _qs('#pt-llm-endpoint').value = d.endpoint || '';
+    _qs('#pt-llm-key').value = d.apiKeyMasked || d.apiKey || '';
+    _qs('#pt-llm-model').value = d.model || '';
+    _qs('#pt-llm-temp').value = d.temperature !== undefined ? d.temperature : 0.3;
+  }
+  // Backtranslation LLM
+  var rb = await _apiAdmin('/admin/backtranslation-llm');
+  if (rb.ok && rb.data) {
+    var db = rb.data;
+    _qs('#pt-bllm-provider').value = db.providerType || '';
+    _qs('#pt-bllm-endpoint').value = db.endpoint || '';
+    _qs('#pt-bllm-key').value = db.apiKeyMasked || db.apiKey || '';
+    _qs('#pt-bllm-model').value = db.model || '';
+    _qs('#pt-bllm-temp').value = db.temperature !== undefined ? db.temperature : 0.3;
+  }
+  // Doc mode
+  var rd = await _apiAdmin('/admin/doc-mode');
+  if (rd.ok && rd.data) {
+    _docMode = rd.data.mode || 'email';
+    _docEmail = rd.data.email || '';
+    _qs('#pt-docmode-select').value = _docMode;
+    _qs('#pt-docmode-email').value = _docEmail;
+    _qs('#pt-docmode-email-group').style.display = _docMode === 'email' ? 'flex' : 'none';
+  }
+  // Stripe
+  var rs = await _apiAdmin('/admin/stripe-config');
+  if (rs.ok && rs.data) {
+    _qs('#pt-stripe-pub').value = rs.data.publishableKey || '';
+    _qs('#pt-stripe-secret').value = rs.data.secretKeyMasked || '';
+    _qs('#pt-stripe-price').value = rs.data.priceId || '';
+    _qs('#pt-stripe-webhook').value = rs.data.webhookSecretMasked || '';
+  }
+  // DB
+  var rdb = await _apiAdmin('/admin/db-config');
+  if (rdb.ok && rdb.data) {
+    _qs('#pt-db-host').value = rdb.data.host || '';
+    _qs('#pt-db-port').value = rdb.data.port || 3306;
+    _qs('#pt-db-name').value = rdb.data.database || '';
+    _qs('#pt-db-user').value = rdb.data.user || '';
+  }
+  // SMTP
+  var rsmtp = await _apiAdmin('/admin/smtp-config');
+  if (rsmtp.ok && rsmtp.data) {
+    _qs('#pt-smtp-host').value = rsmtp.data.host || '';
+    _qs('#pt-smtp-port').value = rsmtp.data.port || 587;
+    _qs('#pt-smtp-from').value = rsmtp.data.from || '';
+    _qs('#pt-smtp-user').value = rsmtp.data.user || '';
+  }
+}
+
+// ── Save LLM ─────────────────────────────────────────────────────────────
+_qs('#pt-llm-save').addEventListener('click', async function() {
+  var payload = {
+    providerType: _qs('#pt-llm-provider').value,
+    endpoint: _qs('#pt-llm-endpoint').value.trim(),
+    apiKey: _qs('#pt-llm-key').value.trim(),
+    model: _qs('#pt-llm-model').value.trim(),
+    temperature: parseFloat(_qs('#pt-llm-temp').value) || 0.3
+  };
+  var r = await _apiAdmin('/admin/llm', { method: 'POST', body: JSON.stringify(payload) });
+  _showAlert(_qs('#pt-llm-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+});
+
+_qs('#pt-bllm-save').addEventListener('click', async function() {
+  var payload = {
+    providerType: _qs('#pt-bllm-provider').value,
+    endpoint: _qs('#pt-bllm-endpoint').value.trim(),
+    apiKey: _qs('#pt-bllm-key').value.trim(),
+    model: _qs('#pt-bllm-model').value.trim(),
+    temperature: parseFloat(_qs('#pt-bllm-temp').value) || 0.3
+  };
+  var r = await _apiAdmin('/admin/backtranslation-llm', { method: 'POST', body: JSON.stringify(payload) });
+  _showAlert(_qs('#pt-bllm-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── Glossary upload ─────────────────────────────────────────────────────
+_qs('#pt-glossary-upload').addEventListener('click', async function() {
+  var file = _qs('#pt-glossary-file').files[0];
+  if (!file) { _showAlert(_qs('#pt-res-alert'), 'Please select a CSV file.', 'error'); return; }
+  var fd = new FormData(); fd.append('file', file);
+  var r = await fetch(_apiBase() + '/admin/upload/glossary', {
+    method: 'POST', headers: { 'x-admin-token': _adminToken }, body: fd
+  });
+  var data = await r.json();
+  _showAlert(_qs('#pt-res-alert'), r.ok ? 'Glossary updated! Entries: ' + (data.entries || '?') : (data.error || 'Upload failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── TMX upload ─────────────────────────────────────────────────────────
+_qs('#pt-tmx-upload').addEventListener('click', async function() {
+  var file = _qs('#pt-tmx-file').files[0];
+  if (!file) { _showAlert(_qs('#pt-res-alert'), 'Please select a TMX file.', 'error'); return; }
+  var fd = new FormData(); fd.append('file', file);
+  var r = await fetch(_apiBase() + '/admin/upload/tmx', {
+    method: 'POST', headers: { 'x-admin-token': _adminToken }, body: fd
+  });
+  var data = await r.json();
+  _showAlert(_qs('#pt-res-alert'), r.ok ? 'TMX updated! Entries: ' + (data.entries || '?') : (data.error || 'Upload failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── Doc mode ──────────────────────────────────────────────────────────────
+_qs('#pt-docmode-select').addEventListener('change', function() {
+  _qs('#pt-docmode-email-group').style.display = this.value === 'email' ? 'flex' : 'none';
+});
+
+_qs('#pt-docmode-save').addEventListener('click', async function() {
+  var payload = { mode: _qs('#pt-docmode-select').value, email: _qs('#pt-docmode-email').value.trim() };
+  var r = await _apiAdmin('/admin/doc-mode', { method: 'POST', body: JSON.stringify(payload) });
+  if (r.ok) { _docMode = payload.mode; _docEmail = payload.email; }
+  _showAlert(_qs('#pt-docmode-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── Documents ─────────────────────────────────────────────────────────────
+async function _loadDocuments() {
+  var wrap = _qs('#pt-docs-table-wrap');
+  wrap.innerHTML = '<p style="color:var(--pt-muted);font-size:0.875rem;">Loading…</p>';
+  var r = await _apiAdmin('/admin/documents');
+  if (!r.ok) { wrap.innerHTML = '<p style="color:var(--pt-error);">Could not load documents.</p>'; return; }
+  var docs = r.data;
+  if (!docs || docs.length === 0) { wrap.innerHTML = '<p style="color:var(--pt-muted);font-size:0.875rem;">No documents uploaded yet.</p>'; return; }
+  var html = '<table class="pt-doc-table"><thead><tr><th>File</th><th>Name</th><th>Email</th><th>Langs</th><th>Date</th><th>Actions</th></tr></thead><tbody>';
+  docs.forEach(function(doc) {
+    var date = doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : '?';
+    html += '<tr>';
+    html += '<td>' + _esc(doc.originalName || doc.filename || '?') + '</td>';
+    html += '<td>' + _esc(doc.name || '') + '</td>';
+    html += '<td>' + _esc(doc.email || '') + '</td>';
+    html += '<td>' + _esc((doc.sourceLang || '?') + ' → ' + (doc.targetLang || '?')) + '</td>';
+    html += '<td>' + date + '</td>';
+    html += '<td><a href="' + _apiBase() + '/admin/documents/' + _esc(doc.id) + '/download?token=' + encodeURIComponent(_adminToken) + '" style="color:var(--pt-orange);margin-right:8px;" download>⬇</a>';
+    html += '<button onclick="window._ptDeleteDoc(\'' + _esc(doc.id) + '\')" style="background:none;border:none;color:var(--pt-error);cursor:pointer;font-size:1rem;">✕</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+window._ptDeleteDoc = async function(id) {
+  if (!confirm('Delete this document?')) return;
+  var r = await _apiAdmin('/admin/documents/' + id, { method: 'DELETE' });
+  if (r.ok) { _loadDocuments(); }
+  else { _showAlert(_qs('#pt-docs-alert'), 'Delete failed.', 'error'); }
+};
+
+_qs('#pt-docs-refresh').addEventListener('click', _loadDocuments);
+
+// ── Members ───────────────────────────────────────────────────────────────
+async function _loadMembers() {
+  var wrap = _qs('#pt-members-list');
+  wrap.innerHTML = '<p style="color:var(--pt-muted);font-size:0.875rem;">Loading…</p>';
+  var r = await _apiAdmin('/admin/members');
+  if (!r.ok) { wrap.innerHTML = '<p style="color:var(--pt-error);">Could not load members.</p>'; return; }
+  var members = Array.isArray(r.data) ? r.data : (r.data.users || r.data.members || []);
+  if (!members.length) { wrap.innerHTML = '<p style="color:var(--pt-muted);">No members yet.</p>'; return; }
+  var html = '<table class="pt-doc-table"><thead><tr><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+  members.forEach(function(m) {
+    var date = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '?';
+    html += '<tr>';
+    html += '<td>' + _esc(m.email || '') + '</td>';
+    html += '<td>' + _esc(m.status || m.subscriptionStatus || 'free') + '</td>';
+    html += '<td>' + date + '</td>';
+    html += '<td><button onclick="window._ptDeleteMember(\'' + _esc(String(m.id || m._id)) + '\')" style="background:none;border:none;color:var(--pt-error);cursor:pointer;">Delete</button></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+window._ptDeleteMember = async function(id) {
+  if (!confirm('Delete this member?')) return;
+  var r = await _apiAdmin('/admin/members/' + id, { method: 'DELETE' });
+  if (r.ok) { _loadMembers(); }
+  else { _showAlert(_qs('#pt-members-alert'), 'Delete failed.', 'error'); }
+};
+
+_qs('#pt-member-create-btn').addEventListener('click', function() {
+  var form = _qs('#pt-member-create-form');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+});
+
+_qs('#pt-new-member-submit').addEventListener('click', async function() {
+  var email = _qs('#pt-new-member-email').value.trim();
+  var pass = _qs('#pt-new-member-password').value;
+  if (!email || !pass) { _showAlert(_qs('#pt-members-alert'), 'Email and password required.', 'error'); return; }
+  var r = await _apiAdmin('/admin/create-member', { method: 'POST', body: JSON.stringify({ email: email, password: pass }) });
+  if (r.ok) {
+    _showAlert(_qs('#pt-members-alert'), 'Member created!', 'success');
+    _qs('#pt-new-member-email').value = '';
+    _qs('#pt-new-member-password').value = '';
+    _loadMembers();
+  } else {
+    _showAlert(_qs('#pt-members-alert'), (r.data && r.data.error) || 'Create failed.', 'error');
+  }
+});
+
+_qs('#pt-member-import-btn').addEventListener('click', function() {
+  _qs('#pt-import-csv-file').click();
+});
+_qs('#pt-import-csv-file').addEventListener('change', async function() {
+  if (!this.files[0]) return;
+  var fd = new FormData(); fd.append('file', this.files[0]);
+  var r = await fetch(_apiBase() + '/admin/import-members', {
+    method: 'POST', headers: { 'x-admin-token': _adminToken }, body: fd
+  });
+  var data = await r.json();
+  _showAlert(_qs('#pt-members-alert'), r.ok ? ('Imported: ' + (data.imported || '?') + ' members.') : (data.error || 'Import failed.'), r.ok ? 'success' : 'error');
+  if (r.ok) _loadMembers();
+});
+
+// ── Stripe ────────────────────────────────────────────────────────────────
+_qs('#pt-stripe-save').addEventListener('click', async function() {
+  var payload = {
+    publishableKey: _qs('#pt-stripe-pub').value.trim(),
+    secretKey: _qs('#pt-stripe-secret').value.trim(),
+    priceId: _qs('#pt-stripe-price').value.trim(),
+    webhookSecret: _qs('#pt-stripe-webhook').value.trim()
+  };
+  var r = await _apiAdmin('/admin/stripe-config', { method: 'POST', body: JSON.stringify(payload) });
+  _showAlert(_qs('#pt-stripe-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── DB ────────────────────────────────────────────────────────────────────
+_qs('#pt-db-save').addEventListener('click', async function() {
+  var payload = {
+    host: _qs('#pt-db-host').value.trim(),
+    port: parseInt(_qs('#pt-db-port').value) || 3306,
+    database: _qs('#pt-db-name').value.trim(),
+    user: _qs('#pt-db-user').value.trim(),
+    password: _qs('#pt-db-pass').value
+  };
+  var r = await _apiAdmin('/admin/db-config', { method: 'POST', body: JSON.stringify(payload) });
+  _showAlert(_qs('#pt-db-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+});
+_qs('#pt-db-init').addEventListener('click', async function() {
+  var r = await _apiAdmin('/admin/db-init', { method: 'POST' });
+  _showAlert(_qs('#pt-db-alert'), r.ok ? 'DB initialized!' : (r.data.error || 'Init failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── SMTP ──────────────────────────────────────────────────────────────────
+_qs('#pt-smtp-save').addEventListener('click', async function() {
+  var payload = {
+    host: _qs('#pt-smtp-host').value.trim(),
+    port: parseInt(_qs('#pt-smtp-port').value) || 587,
+    from: _qs('#pt-smtp-from').value.trim(),
+    user: _qs('#pt-smtp-user').value.trim(),
+    password: _qs('#pt-smtp-pass').value
+  };
+  var r = await _apiAdmin('/admin/smtp-config', { method: 'POST', body: JSON.stringify(payload) });
+  _showAlert(_qs('#pt-smtp-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+});
+_qs('#pt-smtp-test').addEventListener('click', async function() {
+  var r = await _apiAdmin('/admin/smtp-test', { method: 'POST' });
+  _showAlert(_qs('#pt-smtp-alert'), r.ok ? 'Test email sent!' : (r.data.error || 'Test failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── Credentials ───────────────────────────────────────────────────────────
+_qs('#pt-cred-save').addEventListener('click', async function() {
+  var user = _qs('#pt-cred-username').value.trim();
+  var pass = _qs('#pt-cred-password').value;
+  var conf = _qs('#pt-cred-confirm').value;
+  if (!user || !pass) { _showAlert(_qs('#pt-cred-alert'), 'Username and password required.', 'error'); return; }
+  if (pass !== conf) { _showAlert(_qs('#pt-cred-alert'), 'Passwords do not match.', 'error'); return; }
+  if (pass.length < 6) { _showAlert(_qs('#pt-cred-alert'), 'Password must be at least 6 characters.', 'error'); return; }
+  var r = await _apiAdmin('/admin/credentials', { method: 'POST', body: JSON.stringify({ username: user, password: pass }) });
+  _showAlert(_qs('#pt-cred-alert'), r.ok ? 'Credentials updated!' : (r.data.error || 'Update failed.'), r.ok ? 'success' : 'error');
+});
+
+// ── Document upload page ──────────────────────────────────────────────────
+_qs('#pt-upload-back').addEventListener('click', function() {
+  _showView('app');
+  window.history.replaceState(null, '', '/purpletongue');
+});
+
+_qs('#pt-upload-submit').addEventListener('click', async function() {
+  var file = _qs('#pt-upload-file').files[0];
+  var name = _qs('#pt-upload-name').value.trim();
+  var email = _qs('#pt-upload-email').value.trim();
+  var srcLang = _qs('#pt-upload-src').value;
+  var tgtLang = _qs('#pt-upload-tgt').value;
+  var notes = _qs('#pt-upload-notes').value.trim();
+  if (!file) { _showAlert(_qs('#pt-upload-alert'), 'Please select a file.', 'error'); return; }
+  if (!name || !email) { _showAlert(_qs('#pt-upload-alert'), 'Name and email are required.', 'error'); return; }
+  var fd = new FormData();
+  fd.append('file', file);
+  fd.append('name', name);
+  fd.append('email', email);
+  fd.append('sourceLang', srcLang);
+  fd.append('targetLang', tgtLang);
+  fd.append('notes', notes);
+  this.disabled = true;
+  this.textContent = 'Uploading…';
+  var r = await fetch(_apiBase() + '/upload-document', { method: 'POST', body: fd });
+  var data = await r.json();
+  this.disabled = false;
+  this.textContent = _t('submit_request');
+  if (r.ok) {
+    _showAlert(_qs('#pt-upload-alert'), 'Document submitted! We will contact you at ' + email + '.', 'success');
+    _qs('#pt-upload-file').value = '';
+    _qs('#pt-upload-name').value = '';
+    _qs('#pt-upload-email').value = '';
+    _qs('#pt-upload-notes').value = '';
+  } else {
+    _showAlert(_qs('#pt-upload-alert'), (data && data.error) || 'Upload failed.', 'error');
+  }
+});
+
+// ── Admin link in footer ──────────────────────────────────────────────────
+document.querySelector('footer a[href="#/admin"]').addEventListener('click', function(e) {
+  e.preventDefault();
+  window.location.hash = '#/admin';
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────
+_applyI18n();
+_updateDirectionBar();
+_updateUserBar();
+
+// Load doc mode for footer button
+(async function() {
+  try {
+    var r = await fetch(_apiBase() + '/admin/doc-mode');
+    if (r.ok) {
+      var d = await r.json();
+      _docMode = d.mode || 'email';
+      _docEmail = d.email || '';
+    }
+  } catch(e) {}
+})();
+
+})();
+</script>
+</body>
+</html>

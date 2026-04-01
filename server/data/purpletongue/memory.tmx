@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tmx version="1.4">
+  <header
+    creationtool="PurpleTongue"
+    creationtoolversion="1.0"
+    datatype="plaintext"
+    segtype="sentence"
+    adminlang="en-US"
+    srclang="en-US"
+    o-tmf="PurpleTongue TM">
+  </header>
+  <body>
+    <tu tuid="1">
+      <tuv xml:lang="en-US">
+        <seg>The shipment will be delivered within 24 hours.</seg>
+      </tuv>
+      <tuv xml:lang="fr-CA">
+        <seg>L'expédition sera livrée dans les 24 heures.</seg>
+      </tuv>
+      <tuv xml:lang="es-419">
+        <seg>El envío será entregado en 24 horas.</seg>
+      </tuv>
+      <tuv xml:lang="pt-BR">
+        <seg>A remessa será entregue em 24 horas.</seg>
+      </tuv>
+    </tu>
+    <tu tuid="2">
+      <tuv xml:lang="en-US">
+        <seg>Please report any damage to the freight immediately.</seg>
+      </tuv>
+      <tuv xml:lang="fr-CA">
+        <seg>Veuillez signaler immédiatement tout dommage au fret.</seg>
+      </tuv>
+      <tuv xml:lang="es-419">
+        <seg>Informe cualquier daño a la carga de inmediato.</seg>
+      </tuv>
+      <tuv xml:lang="pt-BR">
+        <seg>Informe qualquer dano à carga imediatamente.</seg>
+      </tuv>
+    </tu>
+  </body>
+</tmx>

@@ -1907,6 +1907,22 @@ for (var _ali = 0; _ali < _aliasKeys.length; _ali++) {
   })(_aliasKeys[_ali], _MT_ALIASES[_aliasKeys[_ali]]);
 }
 
+// ── PURPLE TONGUE synchronous gateway (registered before lx(ma) SPA catch-all) ──
+// The actual router is populated by the setTimeout(600) block at the end of this file.
+var _ptGatewayRouter = null;
+ma.use('/purpletongue', function(req, res, next) {
+  if (_ptGatewayRouter) {
+    return _ptGatewayRouter(req, res, next);
+  }
+  // Not ready yet — serve purpletongue.html directly as fallback
+  var _ptHtmlPath = require('path').resolve(__dirname, 'public', 'purpletongue.html');
+  if (require('fs').existsSync(_ptHtmlPath)) {
+    res.set('Content-Type', 'text/html; charset=utf-8');
+    return res.sendFile(_ptHtmlPath);
+  }
+  next();
+});
+
 setTimeout(function _setupMultiTenant() {
   var _mtFs = require("fs");
   var _mtPath = require("path");
@@ -2748,3 +2764,842 @@ setTimeout(function _setupMultiTenant() {
     console.log('  /' + MT_TENANTS[_k] + ' \u2192 ' + MT_TENANTS[_k] + ' sub-site (independent TM, glossary, admin-config)');
   }
 }, 500);
+
+// ═══════════════════════════════════════════════════════════════════
+// PURPLE TONGUE — Quadrilingual Translation App
+// Mounted at /purpletongue — separate from the main app and tenant system
+// ═══════════════════════════════════════════════════════════════════
+setTimeout(function() {
+  try {
+
+var _ptFs = require('fs');
+var _ptPath = require('path');
+var _ptCrypto = require('crypto');
+
+// ── Data directory setup ──────────────────────────────────────────────────
+var PT_HOME_DIR = _ptPath.join(process.env.HOME || process.env.USERPROFILE || '/tmp', '.textappeal', 'purpletongue');
+var PT_UPLOADS_DIR = _ptPath.join(PT_HOME_DIR, 'uploads');
+var PT_GLOSSARY_FILE = _ptPath.join(PT_HOME_DIR, 'glossary.csv');
+var PT_TMX_FILE = _ptPath.join(PT_HOME_DIR, 'memory.tmx');
+var PT_ADMIN_CONFIG_FILE = _ptPath.join(PT_HOME_DIR, 'admin-config.json');
+var PT_DOCUMENTS_FILE = _ptPath.join(PT_HOME_DIR, 'documents.json');
+var PT_PUBLIC_DIR = _ptPath.resolve(__dirname, 'public');
+
+// Seed data files directory
+var PT_SEED_DIR = _ptPath.join(process.cwd(), 'server', 'data', 'purpletongue');
+
+// Create directories
+[PT_HOME_DIR, PT_UPLOADS_DIR].forEach(function(d) {
+  try { _ptFs.mkdirSync(d, { recursive: true }); } catch(e) {}
+});
+
+// Seed files from server/data/purpletongue if not already present
+['glossary.csv', 'memory.tmx', 'admin-config.json', 'documents.json'].forEach(function(fname) {
+  var dest = _ptPath.join(PT_HOME_DIR, fname);
+  var src = _ptPath.join(PT_SEED_DIR, fname);
+  try {
+    if (!_ptFs.existsSync(dest) && _ptFs.existsSync(src)) {
+      _ptFs.copyFileSync(src, dest);
+      console.log('PT: seeded ' + fname);
+    } else if (!_ptFs.existsSync(dest)) {
+      // Create minimal defaults
+      if (fname === 'glossary.csv') _ptFs.writeFileSync(dest, 'en-US,fr-CA,es-419,pt-BR\nCat,Chat,Gato,Gato\n');
+      else if (fname === 'memory.tmx') _ptFs.writeFileSync(dest, '<?xml version="1.0" encoding="UTF-8"?><tmx version="1.4"><header></header><body></body></tmx>\n');
+      else if (fname === 'admin-config.json') _ptFs.writeFileSync(dest, JSON.stringify({ translationLlm: {}, backtranslationLlm: {}, docMode: 'email', contactEmail: '' }, null, 2));
+      else if (fname === 'documents.json') _ptFs.writeFileSync(dest, '[]');
+    }
+  } catch(e) { console.error('PT: seed error for ' + fname, e.message); }
+});
+
+// ── Language column mapping ───────────────────────────────────────────────
+var PT_LANG_COLS = { 'en-US': 0, 'fr-CA': 1, 'es-419': 2, 'pt-BR': 3 };
+var PT_LANG_NAMES = {
+  'en-US': 'US English',
+  'fr-CA': 'Canadian French',
+  'es-419': 'Latin American Spanish',
+  'pt-BR': 'Brazilian Portuguese'
+};
+
+// ── Plain language system prompts ─────────────────────────────────────────
+var PT_SYSTEM_PROMPTS = {
+  'en-US': 'You are translating into plain US English for blue-collar logistics workers. Use short sentences, common words, active voice. Avoid jargon unless it is standard industry terminology. Be direct and clear. Return only the translated text with no explanations or meta-commentary.',
+  'fr-CA': 'Vous traduisez en français canadien simple pour des travailleurs de la logistique. Utilisez des phrases courtes, des mots courants, la voix active. Évitez le jargon sauf la terminologie standard de l\'industrie. Soyez direct et clair. Retournez uniquement le texte traduit, sans explications.',
+  'es-419': 'Estás traduciendo al español latinoamericano sencillo para trabajadores de logística. Usa oraciones cortas, palabras comunes, voz activa. Evita la jerga excepto la terminología estándar de la industria. Sé directo y claro. Devuelve solo el texto traducido, sin explicaciones.',
+  'pt-BR': 'Você está traduzindo para português brasileiro simples para trabalhadores de logística. Use frases curtas, palavras comuns, voz ativa. Evite jargão exceto a terminologia padrão da indústria. Seja direto e claro. Retorne apenas o texto traduzido, sem explicações.'
+};
+
+// ── In-memory data ────────────────────────────────────────────────────────
+var _ptGlossary = [];   // Array of arrays [en-US, fr-CA, es-419, pt-BR]
+var _ptTM = [];         // Array of { [lang]: text } objects
+var _ptAdminConfig = {};
+var _ptDocuments = [];
+var _ptAdminTokens = new Map();
+
+// ── Load glossary ─────────────────────────────────────────────────────────
+function _ptLoadGlossary() {
+  _ptGlossary = [];
+  try {
+    var csv = _ptFs.readFileSync(PT_GLOSSARY_FILE, 'utf8');
+    var lines = csv.split('\n');
+    // Skip header row (line 0)
+    for (var i = 1; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      // Simple CSV parse (handles quoted values)
+      var cols = _ptParseCSVLine(line);
+      if (cols.length >= 4) {
+        _ptGlossary.push(cols);
+      }
+    }
+    console.log('PT: loaded ' + _ptGlossary.length + ' glossary entries');
+  } catch(e) {
+    console.error('PT: glossary load error:', e.message);
+  }
+}
+
+function _ptParseCSVLine(line) {
+  var result = [];
+  var cur = '';
+  var inQuote = false;
+  for (var i = 0; i < line.length; i++) {
+    var ch = line[i];
+    if (ch === '"') { inQuote = !inQuote; }
+    else if (ch === ',' && !inQuote) { result.push(cur.trim()); cur = ''; }
+    else { cur += ch; }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// ── Load TMX ──────────────────────────────────────────────────────────────
+function _ptLoadTMX() {
+  _ptTM = [];
+  try {
+    var xml = _ptFs.readFileSync(PT_TMX_FILE, 'utf8');
+    // Extract TU elements
+    var tuRe = /<tu[^>]*>([\s\S]*?)<\/tu>/gi;
+    var tuvRe = /<tuv[^>]*xml:lang="([^"]+)"[^>]*>\s*<seg>([\s\S]*?)<\/seg>\s*<\/tuv>/gi;
+    var tuMatch;
+    while ((tuMatch = tuRe.exec(xml)) !== null) {
+      var tuContent = tuMatch[1];
+      var entry = {};
+      var tuvMatch;
+      tuvRe.lastIndex = 0;
+      while ((tuvMatch = tuvRe.exec(tuContent)) !== null) {
+        var lang = tuvMatch[1];
+        var seg = tuvMatch[2].replace(/<[^>]+>/g, '').trim();
+        entry[lang] = seg;
+      }
+      if (Object.keys(entry).length > 0) {
+        _ptTM.push(entry);
+      }
+    }
+    console.log('PT: loaded ' + _ptTM.length + ' TM entries');
+  } catch(e) {
+    console.error('PT: TMX load error:', e.message);
+  }
+}
+
+// ── Load admin config ─────────────────────────────────────────────────────
+function _ptLoadConfig() {
+  try {
+    if (_ptFs.existsSync(PT_ADMIN_CONFIG_FILE)) {
+      _ptAdminConfig = JSON.parse(_ptFs.readFileSync(PT_ADMIN_CONFIG_FILE, 'utf8'));
+    } else {
+      _ptAdminConfig = { translationLlm: {}, backtranslationLlm: {}, docMode: 'email', contactEmail: '' };
+    }
+  } catch(e) {
+    console.error('PT: config load error:', e.message);
+    _ptAdminConfig = { translationLlm: {}, backtranslationLlm: {}, docMode: 'email', contactEmail: '' };
+  }
+}
+
+function _ptSaveConfig() {
+  try {
+    _ptFs.writeFileSync(PT_ADMIN_CONFIG_FILE, JSON.stringify(_ptAdminConfig, null, 2));
+    // Also save to seed dir for packaging
+    try {
+      _ptFs.mkdirSync(PT_SEED_DIR, { recursive: true });
+      _ptFs.writeFileSync(_ptPath.join(PT_SEED_DIR, 'admin-config.json'), JSON.stringify(_ptAdminConfig, null, 2));
+    } catch(e) {}
+  } catch(e) { console.error('PT: config save error:', e.message); }
+}
+
+// ── Load documents ────────────────────────────────────────────────────────
+function _ptLoadDocuments() {
+  try {
+    if (_ptFs.existsSync(PT_DOCUMENTS_FILE)) {
+      _ptDocuments = JSON.parse(_ptFs.readFileSync(PT_DOCUMENTS_FILE, 'utf8')) || [];
+    } else {
+      _ptDocuments = [];
+    }
+  } catch(e) { _ptDocuments = []; }
+}
+
+function _ptSaveDocuments() {
+  try {
+    _ptFs.writeFileSync(PT_DOCUMENTS_FILE, JSON.stringify(_ptDocuments, null, 2));
+  } catch(e) { console.error('PT: docs save error:', e.message); }
+}
+
+// ── Resolve LLM config ────────────────────────────────────────────────────
+function _ptGetLLMConfig(which) {
+  // which = 'translation' | 'backtranslation'
+  var key = which === 'backtranslation' ? 'backtranslationLlm' : 'translationLlm';
+  var specific = (_ptAdminConfig[key] && _ptAdminConfig[key].apiKey && _ptAdminConfig[key].model) ? _ptAdminConfig[key] : null;
+  if (specific) return specific;
+  // Fall back to main app config
+  try {
+    var mainCfg = Ga();
+    var mainLlm = mainCfg.llm || {};
+    return {
+      providerType: mainLlm.providerType || 'anthropic',
+      endpoint: mainLlm.endpoint || 'https://api.anthropic.com/v1/messages',
+      apiKey: mainLlm.apiKey || '',
+      model: mainLlm.model || 'claude-sonnet-4-6-20260205',
+      temperature: mainLlm.temperature || 0.3
+    };
+  } catch(e) {
+    return { providerType: 'anthropic', endpoint: 'https://api.anthropic.com/v1/messages', apiKey: '', model: '', temperature: 0.3 };
+  }
+}
+
+function _ptLLMLabel(cfg) {
+  if (!cfg) return '';
+  var m = cfg.model || '';
+  if (m.indexOf('claude') !== -1) return 'Claude';
+  if (m.indexOf('gpt') !== -1) return 'GPT';
+  if (m.indexOf('llama') !== -1) return 'Llama';
+  if (m.indexOf('gemini') !== -1) return 'Gemini';
+  if (m.indexOf('mistral') !== -1) return 'Mistral';
+  return cfg.providerType || 'AI';
+}
+
+// ── Call LLM ──────────────────────────────────────────────────────────────
+async function _ptCallLLM(system, userMsg, llmCfg, tempOverride) {
+  var t = (typeof tempOverride === 'number') ? tempOverride : (llmCfg.temperature || 0.3);
+  if (llmCfg.providerType === 'anthropic') {
+    var r = await fetch(llmCfg.endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': llmCfg.apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify({
+        model: llmCfg.model,
+        max_tokens: 8192,
+        temperature: t,
+        system: system,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+    if (!r.ok) { var errText = await r.text(); throw new Error('LLM error ' + r.status + ': ' + errText); }
+    var data = await r.json();
+    return data.content && data.content[0] ? data.content[0].text : '';
+  } else {
+    var r2 = await fetch(llmCfg.endpoint, {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/json' },
+        llmCfg.apiKey ? { 'Authorization': 'Bearer ' + llmCfg.apiKey } : {}
+      ),
+      body: JSON.stringify({
+        model: llmCfg.model,
+        max_tokens: 8192,
+        temperature: t,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userMsg }
+        ]
+      })
+    });
+    if (!r2.ok) { var errText2 = await r2.text(); throw new Error('LLM error ' + r2.status + ': ' + errText2); }
+    var data2 = await r2.json();
+    return data2.choices && data2.choices[0] ? data2.choices[0].message.content : '';
+  }
+}
+
+// ── Glossary matching (quadrilingual) ─────────────────────────────────────
+var _ptWordCharRe = /[\w\u00C0-\u024F'-]/;
+function _ptIsWordBoundary(text, idx, len) {
+  if (idx > 0 && _ptWordCharRe.test(text[idx - 1])) return false;
+  var end = idx + len;
+  if (end < text.length && _ptWordCharRe.test(text[end])) return false;
+  return true;
+}
+
+function _ptMatchGlossary(text, srcLang, tgtLang) {
+  var srcCol = PT_LANG_COLS[srcLang] !== undefined ? PT_LANG_COLS[srcLang] : 0;
+  var tgtCol = PT_LANG_COLS[tgtLang] !== undefined ? PT_LANG_COLS[tgtLang] : 1;
+  var lower = text.toLowerCase();
+  var matches = [];
+  var ranges = [];
+  for (var i = 0; i < _ptGlossary.length; i++) {
+    var row = _ptGlossary[i];
+    var srcTerm = (row[srcCol] || '').toLowerCase();
+    var tgtTerm = row[tgtCol] || '';
+    if (!srcTerm || srcTerm.length < 2) continue;
+    var idx = lower.indexOf(srcTerm);
+    if (idx === -1) continue;
+    if (!_ptIsWordBoundary(lower, idx, srcTerm.length)) continue;
+    var end = idx + srcTerm.length;
+    var skip = false;
+    for (var j = 0; j < ranges.length; j++) {
+      if (idx >= ranges[j][0] && idx < ranges[j][1]) { skip = true; break; }
+      if (end > ranges[j][0] && end <= ranges[j][1]) { skip = true; break; }
+    }
+    if (!skip) {
+      matches.push({ source: row[srcCol], target: tgtTerm });
+      ranges.push([idx, end]);
+    }
+  }
+  return matches;
+}
+
+// ── TM fuzzy matching ─────────────────────────────────────────────────────
+function _ptMatchTM(text, srcLang, tgtLang, maxResults) {
+  if (!maxResults) maxResults = 5;
+  if (_ptTM.length === 0) return [];
+  var words = text.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 2; });
+  if (words.length === 0) return [];
+  var scored = [];
+  for (var k = 0; k < _ptTM.length; k++) {
+    var entry = _ptTM[k];
+    var srcText = entry[srcLang] || '';
+    if (!srcText) continue;
+    var eWords = srcText.toLowerCase().split(/\s+/).filter(function(w) { return w.length > 2; });
+    if (eWords.length === 0) continue;
+    var overlap = 0;
+    for (var m = 0; m < words.length; m++) {
+      for (var n = 0; n < eWords.length; n++) {
+        if (words[m] === eWords[n]) { overlap++; break; }
+      }
+    }
+    var allWords = {};
+    words.forEach(function(w) { allWords[w] = 1; });
+    eWords.forEach(function(w) { allWords[w] = 1; });
+    var sim = overlap / Object.keys(allWords).length;
+    if (sim >= 0.3) {
+      scored.push({ source: srcText, target: entry[tgtLang] || '', similarity: Math.round(sim * 100) / 100 });
+    }
+  }
+  scored.sort(function(a, b) { return b.similarity - a.similarity; });
+  return scored.slice(0, maxResults);
+}
+
+// ── Build context for LLM prompt ──────────────────────────────────────────
+function _ptBuildContext(glossaryMatches, tmMatches) {
+  var ctx = '';
+  if (glossaryMatches.length > 0) {
+    ctx += '## MANDATORY GLOSSARY — USE THESE EXACT TRANSLATIONS:\n\n';
+    for (var i = 0; i < glossaryMatches.length; i++) {
+      ctx += '\u2022 "' + glossaryMatches[i].source + '" \u2192 "' + glossaryMatches[i].target + '"\n';
+    }
+    ctx += '\n';
+  }
+  if (tmMatches.length > 0) {
+    ctx += '## Translation Memory (use as style/terminology reference):\n\n';
+    for (var j = 0; j < tmMatches.length; j++) {
+      ctx += 'Source: ' + tmMatches[j].source + '\nTarget: ' + tmMatches[j].target + '\n(Similarity: ' + Math.round(tmMatches[j].similarity * 100) + '%)\n\n';
+    }
+  }
+  return ctx;
+}
+
+// ── Admin token management ────────────────────────────────────────────────
+function _ptCheckAdminToken(req) {
+  var token = req.headers['x-admin-token'];
+  if (!token) return false;
+  // Allow tokens from the main app's lt map (same master admin)
+  if (typeof lt !== 'undefined' && lt.has && lt.has(token)) return true;
+  if (_ptAdminTokens.has(token)) {
+    var info = _ptAdminTokens.get(token);
+    if (Date.now() > info.expiresAt) { _ptAdminTokens.delete(token); return false; }
+    return true;
+  }
+  return false;
+}
+
+function _ptGenToken() {
+  return _ptCrypto.randomBytes(32).toString('hex');
+}
+
+// ── Initial data load ─────────────────────────────────────────────────────
+_ptLoadGlossary();
+_ptLoadTMX();
+_ptLoadConfig();
+_ptLoadDocuments();
+
+// ── Express router ────────────────────────────────────────────────────────
+var _ptExpress = require('express');
+var _ptRouter = _ptExpress.Router();
+var _ptMulter = require('multer');
+var _ptUploadTmp = _ptMulter({ dest: '/tmp' });
+var _ptUploadDoc = _ptMulter({
+  dest: PT_UPLOADS_DIR,
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB
+});
+
+// ── Static assets ─────────────────────────────────────────────────────────
+_ptRouter.use(_ptExpress.static(PT_PUBLIC_DIR, { index: false }));
+
+// ── SPA route — serve purpletongue.html ───────────────────────────────────
+function _ptServeHtml(req, res) {
+  var htmlPath = _ptPath.join(PT_PUBLIC_DIR, 'purpletongue.html');
+  if (!_ptFs.existsSync(htmlPath)) {
+    return res.status(404).send('purpletongue.html not found');
+  }
+  res.set('Content-Type', 'text/html; charset=utf-8');
+  res.sendFile(htmlPath);
+}
+
+_ptRouter.get('/', _ptServeHtml);
+
+// ── Translate ─────────────────────────────────────────────────────────────
+_ptRouter.post('/api/translate', async function(req, res) {
+  try {
+    var text = req.body.text;
+    var sourceLang = req.body.sourceLang || 'en-US';
+    var targetLang = req.body.targetLang || 'fr-CA';
+    if (!text) return res.status(400).json({ error: 'Missing text' });
+    if (!PT_LANG_COLS.hasOwnProperty(sourceLang)) return res.status(400).json({ error: 'Invalid sourceLang: ' + sourceLang });
+    if (!PT_LANG_COLS.hasOwnProperty(targetLang)) return res.status(400).json({ error: 'Invalid targetLang: ' + targetLang });
+
+    var translationCfg = _ptGetLLMConfig('translation');
+    if (!translationCfg.apiKey) return res.status(500).json({ error: 'Translation LLM not configured. Please set API key in Admin panel.' });
+
+    // 1. Glossary matching
+    var glossaryMatches = _ptMatchGlossary(text, sourceLang, targetLang);
+    // 2. TM matching
+    var tmMatches = _ptMatchTM(text, sourceLang, targetLang, 5);
+    // 3. Build context
+    var context = _ptBuildContext(glossaryMatches, tmMatches);
+
+    // 4. Call Translation LLM
+    var systemPrompt = PT_SYSTEM_PROMPTS[targetLang] || PT_SYSTEM_PROMPTS['en-US'];
+    var userMsg = context
+      ? (context + '\n\nTranslate the following text from ' + PT_LANG_NAMES[sourceLang] + ' to ' + PT_LANG_NAMES[targetLang] + ':\n\n' + text)
+      : ('Translate the following text from ' + PT_LANG_NAMES[sourceLang] + ' to ' + PT_LANG_NAMES[targetLang] + ':\n\n' + text);
+
+    var translation = await _ptCallLLM(systemPrompt, userMsg, translationCfg);
+
+    // 5. Backtranslation
+    var backtranslation = '';
+    var backtranslationLlmLabel = '';
+    try {
+      var btCfg = _ptGetLLMConfig('backtranslation');
+      if (btCfg && btCfg.apiKey) {
+        var btSystem = 'Translate the following text back into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.';
+        backtranslation = await _ptCallLLM(btSystem, translation, btCfg);
+        backtranslationLlmLabel = _ptLLMLabel(btCfg);
+      }
+    } catch(btErr) {
+      console.error('PT: backtranslation error:', btErr.message);
+    }
+
+    return res.json({
+      translation: translation,
+      backtranslation: backtranslation,
+      translationLlm: _ptLLMLabel(translationCfg),
+      backtranslationLlm: backtranslationLlmLabel,
+      glossaryMatches: glossaryMatches.length,
+      tmMatches: tmMatches.length
+    });
+  } catch(e) {
+    console.error('PT translate error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Retranslate (slightly higher temperature) ─────────────────────────────
+_ptRouter.post('/api/retranslate', async function(req, res) {
+  try {
+    var text = req.body.text;
+    var sourceLang = req.body.sourceLang || 'en-US';
+    var targetLang = req.body.targetLang || 'fr-CA';
+    if (!text) return res.status(400).json({ error: 'Missing text' });
+
+    var translationCfg = _ptGetLLMConfig('translation');
+    if (!translationCfg.apiKey) return res.status(500).json({ error: 'Translation LLM not configured.' });
+
+    var glossaryMatches = _ptMatchGlossary(text, sourceLang, targetLang);
+    var tmMatches = _ptMatchTM(text, sourceLang, targetLang, 5);
+    var context = _ptBuildContext(glossaryMatches, tmMatches);
+
+    var systemPrompt = PT_SYSTEM_PROMPTS[targetLang] || PT_SYSTEM_PROMPTS['en-US'];
+    var userMsg = context
+      ? (context + '\n\nTranslate the following text from ' + PT_LANG_NAMES[sourceLang] + ' to ' + PT_LANG_NAMES[targetLang] + ' (provide an alternative translation):\n\n' + text)
+      : ('Translate the following text from ' + PT_LANG_NAMES[sourceLang] + ' to ' + PT_LANG_NAMES[targetLang] + ' (provide an alternative translation):\n\n' + text);
+
+    // Use higher temperature for retranslation
+    var retranslateTemp = Math.min(1.0, (translationCfg.temperature || 0.3) * 1.5 + 0.2);
+    var translation = await _ptCallLLM(systemPrompt, userMsg, translationCfg, retranslateTemp);
+
+    var backtranslation = '';
+    var backtranslationLlmLabel = '';
+    try {
+      var btCfg = _ptGetLLMConfig('backtranslation');
+      if (btCfg && btCfg.apiKey) {
+        var btSystem = 'Translate the following text back into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.';
+        backtranslation = await _ptCallLLM(btSystem, translation, btCfg);
+        backtranslationLlmLabel = _ptLLMLabel(btCfg);
+      }
+    } catch(btErr) {
+      console.error('PT: backtranslation error:', btErr.message);
+    }
+
+    return res.json({
+      translation: translation,
+      backtranslation: backtranslation,
+      translationLlm: _ptLLMLabel(translationCfg),
+      backtranslationLlm: backtranslationLlmLabel,
+      glossaryMatches: glossaryMatches.length,
+      tmMatches: tmMatches.length
+    });
+  } catch(e) {
+    console.error('PT retranslate error:', e.message);
+    return res.status(500).json({ error: e.message });
+  }
+});
+
+// ── Admin login ───────────────────────────────────────────────────────────
+_ptRouter.post('/api/admin/login', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+  if (!username || !password) return res.status(400).json({ error: 'Username and password required' });
+  // Use main app's admin credentials
+  try {
+    if (!ex(username, password)) return res.status(401).json({ error: 'Invalid credentials' });
+  } catch(e) {
+    // Fallback: check against stored hash
+    var cfg = _ptAdminConfig;
+    if (cfg.adminUsername && cfg.adminPasswordHash) {
+      var hash = _ptCrypto.createHash('sha256').update(password).digest('hex');
+      if (username !== cfg.adminUsername || hash !== cfg.adminPasswordHash) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
+    } else {
+      return res.status(401).json({ error: 'Admin not configured' });
+    }
+  }
+  var token = _ptGenToken();
+  _ptAdminTokens.set(token, { expiresAt: Date.now() + 1440 * 60 * 1000 });
+  return res.json({ token: token });
+});
+
+// ── Admin: GET Translation LLM ────────────────────────────────────────────
+_ptRouter.get('/api/admin/llm', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var cfg = _ptAdminConfig.translationLlm || {};
+  // Try to merge with main app's LLM config as defaults
+  try {
+    var mainLlm = Ga().llm || {};
+    var result = {
+      providerType: cfg.providerType || mainLlm.providerType || 'anthropic',
+      endpoint: cfg.endpoint || mainLlm.endpoint || '',
+      apiKey: cfg.apiKey || mainLlm.apiKey || '',
+      model: cfg.model || mainLlm.model || '',
+      temperature: cfg.temperature !== undefined ? cfg.temperature : (mainLlm.temperature || 0.3)
+    };
+    var masked = result.apiKey ? result.apiKey.substring(0, 12) + '...' + result.apiKey.substring(result.apiKey.length - 4) : '';
+    result.apiKeyMasked = masked;
+    return res.json(result);
+  } catch(e) {
+    var masked2 = cfg.apiKey ? cfg.apiKey.substring(0, 12) + '...' + cfg.apiKey.substring(cfg.apiKey.length - 4) : '';
+    return res.json(Object.assign({}, cfg, { apiKeyMasked: masked2 }));
+  }
+});
+
+// ── Admin: POST Translation LLM ───────────────────────────────────────────
+_ptRouter.post('/api/admin/llm', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var b = req.body;
+  var existing = _ptAdminConfig.translationLlm || {};
+  var apiKey = (b.apiKey && !b.apiKey.includes('...')) ? b.apiKey : (existing.apiKey || '');
+  _ptAdminConfig.translationLlm = {
+    providerType: b.providerType || 'anthropic',
+    endpoint: b.endpoint || '',
+    apiKey: apiKey,
+    model: b.model || '',
+    temperature: typeof b.temperature === 'number' ? b.temperature : (existing.temperature || 0.3)
+  };
+  _ptSaveConfig();
+  return res.json({ ok: true, message: 'Translation LLM configuration saved' });
+});
+
+// ── Admin: GET Backtranslation LLM ────────────────────────────────────────
+_ptRouter.get('/api/admin/backtranslation-llm', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var cfg = _ptAdminConfig.backtranslationLlm || {};
+  var masked = cfg.apiKey ? cfg.apiKey.substring(0, 12) + '...' + cfg.apiKey.substring(cfg.apiKey.length - 4) : '';
+  return res.json(Object.assign({}, cfg, { apiKeyMasked: masked }));
+});
+
+// ── Admin: POST Backtranslation LLM ───────────────────────────────────────
+_ptRouter.post('/api/admin/backtranslation-llm', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var b = req.body;
+  var existing = _ptAdminConfig.backtranslationLlm || {};
+  var apiKey = (b.apiKey && !b.apiKey.includes('...')) ? b.apiKey : (existing.apiKey || '');
+  _ptAdminConfig.backtranslationLlm = {
+    providerType: b.providerType || '',
+    endpoint: b.endpoint || '',
+    apiKey: apiKey,
+    model: b.model || '',
+    temperature: typeof b.temperature === 'number' ? b.temperature : (existing.temperature || 0.3)
+  };
+  _ptSaveConfig();
+  return res.json({ ok: true, message: 'Backtranslation LLM configuration saved' });
+});
+
+// ── Admin: doc-mode GET/POST ──────────────────────────────────────────────
+_ptRouter.get('/api/admin/doc-mode', function(req, res) {
+  // Public endpoint: frontend needs it to know where doc button goes
+  return res.json({
+    mode: _ptAdminConfig.docMode || 'email',
+    email: _ptAdminConfig.contactEmail || ''
+  });
+});
+
+_ptRouter.post('/api/admin/doc-mode', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var mode = req.body.mode;
+  var email = req.body.email || '';
+  if (mode !== 'email' && mode !== 'upload') return res.status(400).json({ error: "Mode must be 'email' or 'upload'" });
+  _ptAdminConfig.docMode = mode;
+  _ptAdminConfig.contactEmail = email;
+  _ptSaveConfig();
+  return res.json({ ok: true, mode: mode, email: email });
+});
+
+// ── Admin: glossary upload ────────────────────────────────────────────────
+_ptRouter.post('/api/admin/upload/glossary', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var upload = _ptUploadTmp.single('file');
+  upload(req, res, function(err) {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    _ptFs.copyFileSync(req.file.path, PT_GLOSSARY_FILE);
+    _ptFs.unlinkSync(req.file.path);
+    // Also update seed dir
+    try { _ptFs.copyFileSync(PT_GLOSSARY_FILE, _ptPath.join(PT_SEED_DIR, 'glossary.csv')); } catch(e) {}
+    _ptLoadGlossary();
+    return res.json({ ok: true, message: 'Glossary updated', entries: _ptGlossary.length });
+  });
+});
+
+// ── Admin: TMX upload ─────────────────────────────────────────────────────
+_ptRouter.post('/api/admin/upload/tmx', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var upload = _ptUploadTmp.single('file');
+  upload(req, res, function(err) {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    _ptFs.copyFileSync(req.file.path, PT_TMX_FILE);
+    _ptFs.unlinkSync(req.file.path);
+    try { _ptFs.copyFileSync(PT_TMX_FILE, _ptPath.join(PT_SEED_DIR, 'memory.tmx')); } catch(e) {}
+    _ptLoadTMX();
+    return res.json({ ok: true, message: 'Translation Memory updated', entries: _ptTM.length });
+  });
+});
+
+// ── Admin: documents list ─────────────────────────────────────────────────
+_ptRouter.get('/api/admin/documents', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  _ptLoadDocuments();
+  return res.json(_ptDocuments);
+});
+
+// ── Admin: document download ──────────────────────────────────────────────
+_ptRouter.get('/api/admin/documents/:id/download', function(req, res) {
+  // Accept token via query param for direct link downloads
+  var token = req.headers['x-admin-token'] || req.query.token;
+  var isValid = false;
+  if (token) {
+    if (typeof lt !== 'undefined' && lt.has && lt.has(token)) isValid = true;
+    else if (_ptAdminTokens.has(token)) {
+      var info = _ptAdminTokens.get(token);
+      if (Date.now() <= info.expiresAt) isValid = true;
+    }
+  }
+  if (!isValid) return res.status(401).json({ error: 'Unauthorized' });
+  _ptLoadDocuments();
+  var doc = _ptDocuments.find(function(d) { return d.id === req.params.id; });
+  if (!doc) return res.status(404).json({ error: 'Document not found' });
+  var filePath = _ptPath.join(PT_UPLOADS_DIR, doc.savedFilename || doc.id);
+  if (!_ptFs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' });
+  return res.download(filePath, doc.originalName || doc.savedFilename || 'document');
+});
+
+// ── Admin: document delete ────────────────────────────────────────────────
+_ptRouter.delete('/api/admin/documents/:id', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  _ptLoadDocuments();
+  var idx = _ptDocuments.findIndex(function(d) { return d.id === req.params.id; });
+  if (idx === -1) return res.status(404).json({ error: 'Document not found' });
+  var doc = _ptDocuments[idx];
+  // Delete file from disk
+  try {
+    var fp = _ptPath.join(PT_UPLOADS_DIR, doc.savedFilename || doc.id);
+    if (_ptFs.existsSync(fp)) _ptFs.unlinkSync(fp);
+  } catch(e) {}
+  _ptDocuments.splice(idx, 1);
+  _ptSaveDocuments();
+  return res.json({ ok: true });
+});
+
+// ── Admin: proxy shared endpoints to main app ─────────────────────────────
+var _ptSharedAdminPaths = [
+  '/api/admin/stripe-config',
+  '/api/admin/db-config',
+  '/api/admin/db-init',
+  '/api/admin/smtp-config',
+  '/api/admin/smtp-test',
+  '/api/admin/usage-stats',
+  '/api/admin/credentials',
+  '/api/admin/models',
+  '/api/admin/web-search-key'
+];
+_ptSharedAdminPaths.forEach(function(p) {
+  _ptRouter.all(p, function(req, res) {
+    if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+    var origUrl = req.url;
+    var origBaseUrl = req.baseUrl;
+    req.url = p;
+    req.baseUrl = '';
+    ma.handle(req, res, function() {
+      req.url = origUrl;
+      req.baseUrl = origBaseUrl;
+      res.status(404).json({ error: 'Not found' });
+    });
+  });
+});
+
+// Members: proxy with PURPLETONGUE tenant header
+_ptRouter.all('/api/admin/members', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  req.headers['x-tenant'] = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/admin/members'; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
+
+_ptRouter.all('/api/admin/members/:id', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  req.headers['x-tenant'] = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/admin/members/' + req.params.id; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
+
+_ptRouter.post('/api/admin/create-member', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.body) req.body = {};
+  req.body.tenant = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/admin/create-member'; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
+
+_ptRouter.post('/api/admin/import-members', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  if (!req.body) req.body = {};
+  req.body.tenant = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/admin/import-members'; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
+
+// ── Document upload endpoint ──────────────────────────────────────────────
+_ptRouter.post('/api/upload-document', function(req, res) {
+  var upload = _ptMulter({
+    storage: _ptMulter.diskStorage({
+      destination: function(req, file, cb) { cb(null, PT_UPLOADS_DIR); },
+      filename: function(req, file, cb) {
+        var ts = Date.now();
+        var ext = _ptPath.extname(file.originalname) || '';
+        var safe = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+        cb(null, ts + '_' + safe);
+      }
+    }),
+    limits: { fileSize: 50 * 1024 * 1024 }
+  }).single('file');
+
+  upload(req, res, function(err) {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+    var docId = _ptCrypto.randomBytes(16).toString('hex');
+    var metadata = {
+      id: docId,
+      originalName: req.file.originalname,
+      savedFilename: req.file.filename,
+      name: (req.body && req.body.name) || '',
+      email: (req.body && req.body.email) || '',
+      sourceLang: (req.body && req.body.sourceLang) || 'en-US',
+      targetLang: (req.body && req.body.targetLang) || 'fr-CA',
+      notes: (req.body && req.body.notes) || '',
+      uploadedAt: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    _ptLoadDocuments();
+    _ptDocuments.unshift(metadata);
+    _ptSaveDocuments();
+
+    return res.json({ ok: true, id: docId, message: 'Document uploaded successfully' });
+  });
+});
+
+// ── User auth: proxy to main app with PURPLETONGUE tenant ─────────────────
+_ptRouter.post('/api/user/register', function(req, res) {
+  if (!req.body) req.body = {};
+  req.body.tenant = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/user/register'; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
+
+_ptRouter.post('/api/user/login', function(req, res) {
+  if (!req.body) req.body = {};
+  req.body.tenant = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/user/login'; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
+
+var _ptUserPassthroughPaths = [
+  '/api/user/logout',
+  '/api/user/me',
+  '/api/user/subscribe',
+  '/api/user/subscription-status',
+  '/api/user/forgot-password',
+  '/api/user/reset-password',
+  '/api/user/cancel-subscription',
+  '/api/user/verify-email',
+  '/api/user/resend-verification',
+  '/api/user/change-password',
+  '/api/freemium-config',
+  '/api/stripe/webhook'
+];
+_ptUserPassthroughPaths.forEach(function(p) {
+  _ptRouter.all(p, function(req, res) {
+    var origUrl = req.url; var origBaseUrl = req.baseUrl;
+    req.url = p; req.baseUrl = '';
+    ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+  });
+});
+
+// ── SPA catch-all (must be last) ──────────────────────────────────────────
+_ptRouter.get('/*splat', _ptServeHtml);
+
+// ── Mount the router on /purpletongue ─────────────────────────────────────
+_ptGatewayRouter = _ptRouter;  // activate the synchronous gateway
+
+console.log('\u2550\u2550\u2550 Purple Tongue routes registered at /purpletongue \u2550\u2550\u2550');
+
+  } catch(ptErr) {
+    console.error('Purple Tongue init error:', ptErr.message, ptErr.stack);
+  }
+}, 600);
