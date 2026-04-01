@@ -2211,9 +2211,13 @@ setTimeout(function _setupMultiTenant() {
 
   function _mtServeTenantHtml(req, res, tenantId) {
     if (!_mtIndexHtml) return res.status(500).send('Could not load app');
-    // Inject: base href + tenant context script
-    // Place it right after <head> tag
-    var injection = '<base href="/' + tenantId + '/"><script>window.__tenant="' + tenantId + '";window.__tenantApiPrefix="/' + tenantId + '";</script>';
+    // Detect the URL slug used (could be an alias like HYPOTHEQUES instead of MPC)
+    // req.baseUrl is set by Express to the mount path (e.g., '/HYPOTHEQUES' or '/MPC')
+    var urlSlug = req.baseUrl ? req.baseUrl.replace(/^\//, '') : tenantId;
+    if (!urlSlug) urlSlug = tenantId;
+    // base href uses the URL slug (so assets load from the alias path)
+    // __tenant and __tenantApiPrefix use the slug too (the alias gateway routes it to the right router)
+    var injection = '<base href="/' + urlSlug + '/"><script>window.__tenant="' + tenantId + '";window.__tenantApiPrefix="/' + urlSlug + '";</script>';
     var html = _mtIndexHtml.replace('<head>', '<head>' + injection);
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
