@@ -1,4 +1,4 @@
-// Build: 2026-04-02T06:57 EDT - config persistence v3
+// Build: 2026-04-02T07:04 EDT - BT fallback fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

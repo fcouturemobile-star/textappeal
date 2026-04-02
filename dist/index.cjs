@@ -3023,10 +3023,10 @@ function _ptGetLLMConfig(which) {
     if (specific.apiKey) return specific;
   }
 
-  // For backtranslation, fall back to translation config first (not main app)
+  // For backtranslation, ALWAYS fall back to translation config if no specific BT config
   if (which === 'backtranslation') {
-    var tCfg = _ptAdminConfig.translationLlm;
-    if (tCfg && tCfg.apiKey && tCfg.model) return tCfg;
+    var tCfg = _ptAdminConfig.translationLlm || {};
+    if (tCfg.apiKey) return tCfg;
   }
 
   // Last resort: fall back to main app config
