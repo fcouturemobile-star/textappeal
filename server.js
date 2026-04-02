@@ -1,4 +1,4 @@
-// Build: 2026-04-02T06:07 EDT - PT full height
+// Build: 2026-04-02T06:12 EDT - PT app-view flex
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
