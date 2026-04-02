@@ -958,7 +958,8 @@ input[type="file"].pt-input { cursor: pointer; }
           </div>
           <div class="pt-form-group">
             <label>Model</label>
-            <input type="text" class="pt-input" id="pt-llm-model" placeholder="claude-sonnet-4-6-20260205">
+            <select class="pt-input" id="pt-llm-model" style="cursor:pointer"><option value="">Loading models...</option></select>
+            <input type="text" class="pt-input" id="pt-llm-model-custom" placeholder="Or type a custom model ID" style="margin-top:6px;font-size:12px">
           </div>
           <div class="pt-form-group">
             <label>Temperature (0–1)</label>
@@ -992,7 +993,8 @@ input[type="file"].pt-input { cursor: pointer; }
           </div>
           <div class="pt-form-group">
             <label>Model</label>
-            <input type="text" class="pt-input" id="pt-bllm-model" placeholder="(same as Translation LLM)">
+            <select class="pt-input" id="pt-bllm-model" style="cursor:pointer"><option value="">Loading models...</option></select>
+            <input type="text" class="pt-input" id="pt-bllm-model-custom" placeholder="Or type a custom model ID" style="margin-top:6px;font-size:12px">
           </div>
           <div class="pt-form-group">
             <label>Temperature (0–1)</label>
@@ -1719,6 +1721,53 @@ _qsa('#pt-admin-nav .pt-admin-nav-item').forEach(function(btn) {
 });
 
 // ── Load admin data ────────────────────────────────────────────────────────
+// ── Model list fetcher ────────────────────────────────────────────────────
+async function _ptLoadModels(selectId, providerType, currentModel) {
+  var sel = _qs('#' + selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Fetching models...</option>';
+  try {
+    var r = await _apiAdmin('/admin/models?provider=' + encodeURIComponent(providerType));
+    if (r.ok && r.data) {
+      var models = r.data[providerType] || r.data.openrouter || [];
+      sel.innerHTML = '';
+      if (models.length === 0) {
+        sel.innerHTML = '<option value="">No models found</option>';
+      } else {
+        for (var i = 0; i < models.length; i++) {
+          var opt = document.createElement('option');
+          opt.value = models[i];
+          opt.textContent = models[i];
+          if (models[i] === currentModel) opt.selected = true;
+          sel.appendChild(opt);
+        }
+        if (currentModel && !models.includes(currentModel)) {
+          var copt = document.createElement('option');
+          copt.value = currentModel;
+          copt.textContent = currentModel + ' (current)';
+          copt.selected = true;
+          sel.insertBefore(copt, sel.firstChild);
+        }
+      }
+    } else {
+      sel.innerHTML = '<option value="' + _esc(currentModel) + '">' + _esc(currentModel || 'Error loading models') + '</option>';
+    }
+  } catch(e) {
+    sel.innerHTML = '<option value="' + _esc(currentModel) + '">' + _esc(currentModel || 'Error') + '</option>';
+  }
+}
+
+// Reload models when provider type changes
+_qs('#pt-llm-provider').addEventListener('change', function() {
+  _ptLoadModels('pt-llm-model', this.value, '');
+  // Auto-set endpoint for OpenRouter
+  if (this.value === 'openrouter') _qs('#pt-llm-endpoint').value = 'https://openrouter.ai/api/v1/chat/completions';
+});
+_qs('#pt-bllm-provider').addEventListener('change', function() {
+  _ptLoadModels('pt-bllm-model', this.value, '');
+  if (this.value === 'openrouter') _qs('#pt-bllm-endpoint').value = 'https://openrouter.ai/api/v1/chat/completions';
+});
+
 async function _loadAdminData() {
   // LLM config
   var r = await _apiAdmin('/admin/llm');
@@ -1727,7 +1776,7 @@ async function _loadAdminData() {
     _qs('#pt-llm-provider').value = d.providerType || 'anthropic';
     _qs('#pt-llm-endpoint').value = d.endpoint || '';
     _qs('#pt-llm-key').value = d.apiKeyMasked || d.apiKey || '';
-    _qs('#pt-llm-model').value = d.model || '';
+    await _ptLoadModels('pt-llm-model', d.providerType || 'openrouter', d.model || '');
     _qs('#pt-llm-temp').value = d.temperature !== undefined ? d.temperature : 0.3;
   }
   // Backtranslation LLM
@@ -1737,7 +1786,7 @@ async function _loadAdminData() {
     _qs('#pt-bllm-provider').value = db.providerType || '';
     _qs('#pt-bllm-endpoint').value = db.endpoint || '';
     _qs('#pt-bllm-key').value = db.apiKeyMasked || db.apiKey || '';
-    _qs('#pt-bllm-model').value = db.model || '';
+    await _ptLoadModels('pt-bllm-model', db.providerType || d.providerType || 'openrouter', db.model || '');
     _qs('#pt-bllm-temp').value = db.temperature !== undefined ? db.temperature : 0.3;
   }
   // Doc mode
@@ -1781,7 +1830,7 @@ _qs('#pt-llm-save').addEventListener('click', async function() {
     providerType: _qs('#pt-llm-provider').value,
     endpoint: _qs('#pt-llm-endpoint').value.trim(),
     apiKey: _qs('#pt-llm-key').value.trim(),
-    model: _qs('#pt-llm-model').value.trim(),
+    model: (_qs('#pt-llm-model-custom').value.trim() || _qs('#pt-llm-model').value),
     temperature: parseFloat(_qs('#pt-llm-temp').value) || 0.3
   };
   var r = await _apiAdmin('/admin/llm', { method: 'POST', body: JSON.stringify(payload) });
@@ -1793,7 +1842,7 @@ _qs('#pt-bllm-save').addEventListener('click', async function() {
     providerType: _qs('#pt-bllm-provider').value,
     endpoint: _qs('#pt-bllm-endpoint').value.trim(),
     apiKey: _qs('#pt-bllm-key').value.trim(),
-    model: _qs('#pt-bllm-model').value.trim(),
+    model: (_qs('#pt-bllm-model-custom').value.trim() || _qs('#pt-bllm-model').value),
     temperature: parseFloat(_qs('#pt-bllm-temp').value) || 0.3
   };
   var r = await _apiAdmin('/admin/backtranslation-llm', { method: 'POST', body: JSON.stringify(payload) });

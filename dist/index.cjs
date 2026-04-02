@@ -3308,6 +3308,31 @@ _ptRouter.post('/api/admin/login', function(req, res) {
   return res.json({ token: token });
 });
 
+// ── Admin: Models list (fetch from OpenRouter/etc) ────────────────────────
+_ptRouter.get('/api/admin/models', async function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var provider = req.query.provider || 'openrouter';
+  var fallback = {
+    anthropic: ['claude-sonnet-4-6-20260205','claude-opus-4-6-20260205','claude-haiku-4-5-20251001','claude-sonnet-4-20250514','claude-opus-4-20250514','claude-3-7-sonnet-20250219'],
+    'openai-compatible': ['gpt-5.4','gpt-5.4-mini','gpt-5.4-nano','gpt-5-mini','gpt-4o','gpt-4o-mini','o3-mini'],
+    openrouter: ['anthropic/claude-sonnet-4-6','anthropic/claude-opus-4-6','openai/gpt-5.4','openai/gpt-5.4-mini','google/gemini-2.5-pro','meta-llama/llama-4-scout','mistralai/mistral-large','deepseek/deepseek-chat'],
+    groq: ['meta-llama/llama-4-scout-17b-16e-instruct','llama-3.3-70b-versatile','llama-3.1-8b-instant']
+  };
+  var result = Object.assign({}, fallback);
+  try {
+    if (provider === 'openrouter') {
+      var mr = await fetch('https://openrouter.ai/api/v1/models');
+      if (mr.ok) {
+        var md = await mr.json();
+        if (md.data && Array.isArray(md.data)) {
+          result.openrouter = md.data.filter(function(m) { return m.architecture && m.architecture.modality && m.architecture.modality.includes('text'); }).map(function(m) { return m.id; }).sort();
+        }
+      }
+    }
+  } catch(e) { console.warn('PT models fetch error:', e.message); }
+  return res.json(result);
+});
+
 // ── Admin: GET Translation LLM ────────────────────────────────────────────
 _ptRouter.get('/api/admin/llm', function(req, res) {
   if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
