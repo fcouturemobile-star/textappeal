@@ -1,5 +1,5 @@
 // Text Appeal PWA Service Worker
-const CACHE_NAME = 'textappeal-v1';
+const CACHE_NAME = 'textappeal-v2';
 const OFFLINE_URL = '/offline.html';
 
 // Pre-cache essential assets on install
@@ -53,11 +53,24 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // For other requests (assets), try cache first, then network
+  // For HTML files, use network-first (so deployments take effect immediately)
+  if (url.pathname.endsWith('.html') || url.pathname === '/' || !url.pathname.match(/\.[a-z0-9]+$/i)) {
+    event.respondWith(
+      fetch(event.request).then(response => {
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // For other requests (JS, CSS, images), try cache first, then network
   event.respondWith(
     caches.match(event.request).then(cached => {
       return cached || fetch(event.request).then(response => {
-        // Cache successful responses for static assets
         if (response.ok && url.pathname.match(/\.(js|css|png|svg|woff2?)$/)) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
