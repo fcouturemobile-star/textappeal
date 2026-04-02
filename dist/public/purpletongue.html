@@ -24,11 +24,16 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+html {
+  height: 100%;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background: var(--pt-bg);
   color: var(--pt-text);
-  min-height: 100vh;
+  min-height: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
 }
@@ -200,8 +205,8 @@ a:hover { text-decoration: underline; }
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: var(--pt-gap);
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 auto;
+  min-height: 300px;
 }
 
 .pt-pane {
