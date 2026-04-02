@@ -1,4 +1,4 @@
-// Build: 2026-04-01T21:32 EDT - simplified PT admin auth
+// Build: 2026-04-01T21:39 EDT - LLM fallback + labels
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

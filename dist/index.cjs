@@ -2946,9 +2946,27 @@ function _ptSaveDocuments() {
 function _ptGetLLMConfig(which) {
   // which = 'translation' | 'backtranslation'
   var key = which === 'backtranslation' ? 'backtranslationLlm' : 'translationLlm';
-  var specific = (_ptAdminConfig[key] && _ptAdminConfig[key].apiKey && _ptAdminConfig[key].model) ? _ptAdminConfig[key] : null;
-  if (specific) return specific;
-  // Fall back to main app config
+  var specific = _ptAdminConfig[key] || null;
+
+  // If the specific config has a model, use it (inherit API key from translation if blank)
+  if (specific && specific.model) {
+    if (!specific.apiKey) {
+      // Inherit API key from translation config
+      var translationCfg = _ptAdminConfig.translationLlm || {};
+      specific = Object.assign({}, specific, { apiKey: translationCfg.apiKey || '' });
+      if (!specific.endpoint) specific.endpoint = translationCfg.endpoint || '';
+      if (!specific.providerType) specific.providerType = translationCfg.providerType || 'openrouter';
+    }
+    if (specific.apiKey) return specific;
+  }
+
+  // For backtranslation, fall back to translation config first (not main app)
+  if (which === 'backtranslation') {
+    var tCfg = _ptAdminConfig.translationLlm;
+    if (tCfg && tCfg.apiKey && tCfg.model) return tCfg;
+  }
+
+  // Last resort: fall back to main app config
   try {
     var mainCfg = Ga();
     var mainLlm = mainCfg.llm || {};
@@ -2967,9 +2985,19 @@ function _ptGetLLMConfig(which) {
 function _ptLLMLabel(cfg) {
   if (!cfg) return '';
   var m = cfg.model || '';
-  // Return the actual model ID for clarity (e.g., 'anthropic/claude-sonnet-4-6' or 'openai/gpt-oss-120b')
-  if (m) return m;
-  return cfg.providerType || 'AI';
+  var provider = cfg.providerType || '';
+  // Build a human-readable label: "Model Name via Provider"
+  if (m) {
+    // Prettify model name: 'anthropic/claude-sonnet-4-6' -> 'Claude Sonnet 4.6'
+    var displayModel = m;
+    if (m.includes('/')) displayModel = m.split('/').pop(); // strip provider prefix
+    displayModel = displayModel.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+    // Replace version dots: '4 6' -> '4.6'
+    displayModel = displayModel.replace(/(\d) (\d)/g, '$1.$2');
+    var providerLabel = provider === 'openrouter' ? 'OpenRouter' : provider === 'anthropic' ? 'Anthropic' : provider === 'openai-compatible' ? 'OpenAI' : provider === 'groq' ? 'Groq' : provider;
+    return displayModel + (providerLabel ? ' via ' + providerLabel : '');
+  }
+  return provider || 'AI';
 }
 
 // ── Call LLM ──────────────────────────────────────────────────────────────
