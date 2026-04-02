@@ -1,4 +1,4 @@
-// Build: 2026-04-02T08:03 EDT - no default admin config in zip
+// Build: 2026-04-02T08:20 EDT - Rough Version label
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
