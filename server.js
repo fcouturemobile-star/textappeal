@@ -1,4 +1,4 @@
-// Build: 2026-04-01T21:08 EDT - model labels
+// Build: 2026-04-01T21:12 EDT - members auth fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

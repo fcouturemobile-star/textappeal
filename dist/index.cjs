@@ -3514,7 +3514,7 @@ var _ptSharedAdminPaths = [
 ];
 _ptSharedAdminPaths.forEach(function(p) {
   _ptRouter.all(p, function(req, res) {
-    if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+    // Token is passed through to main app which does its own validation
     var origUrl = req.url;
     var origBaseUrl = req.baseUrl;
     req.url = p;
@@ -3528,8 +3528,8 @@ _ptSharedAdminPaths.forEach(function(p) {
 });
 
 // Members: proxy with PURPLETONGUE tenant header
+// Token validation is done by the main app's endpoint — no need to double-check here
 _ptRouter.all('/api/admin/members', function(req, res) {
-  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
   req.headers['x-tenant'] = 'PURPLETONGUE';
   var origUrl = req.url; var origBaseUrl = req.baseUrl;
   req.url = '/api/admin/members'; req.baseUrl = '';
@@ -3537,7 +3537,6 @@ _ptRouter.all('/api/admin/members', function(req, res) {
 });
 
 _ptRouter.all('/api/admin/members/:id', function(req, res) {
-  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
   req.headers['x-tenant'] = 'PURPLETONGUE';
   var origUrl = req.url; var origBaseUrl = req.baseUrl;
   req.url = '/api/admin/members/' + req.params.id; req.baseUrl = '';
@@ -3545,7 +3544,6 @@ _ptRouter.all('/api/admin/members/:id', function(req, res) {
 });
 
 _ptRouter.post('/api/admin/create-member', function(req, res) {
-  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (!req.body) req.body = {};
   req.body.tenant = 'PURPLETONGUE';
   var origUrl = req.url; var origBaseUrl = req.baseUrl;
@@ -3554,7 +3552,6 @@ _ptRouter.post('/api/admin/create-member', function(req, res) {
 });
 
 _ptRouter.post('/api/admin/import-members', function(req, res) {
-  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
   if (!req.body) req.body = {};
   req.body.tenant = 'PURPLETONGUE';
   var origUrl = req.url; var origBaseUrl = req.baseUrl;

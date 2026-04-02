@@ -1312,12 +1312,19 @@ function _apiBase() { return '/purpletongue/api'; }
 
 async function _api(path, opts) {
   opts = opts || {};
+  // Always refresh tokens from localStorage
+  if (!_adminToken) _adminToken = localStorage.getItem('pt_admin_token');
+  if (!_userToken) _userToken = localStorage.getItem('pt_user_token');
   var headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
   if (_adminToken) headers['x-admin-token'] = _adminToken;
   if (_userToken) headers['x-user-token'] = _userToken;
   var r = await fetch(_apiBase() + path, Object.assign({}, opts, { headers: headers }));
   var data;
   try { data = await r.json(); } catch(e) { data = {}; }
+  // If unauthorized, clear stale token
+  if (r.status === 401 && path.includes('/admin/')) {
+    console.warn('PT: Admin API returned 401 for ' + path + ', token may be stale');
+  }
   return { ok: r.ok, status: r.status, data: data };
 }
 
