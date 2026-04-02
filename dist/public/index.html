@@ -43,6 +43,7 @@
       window.__tenantApiPrefix = '/' + realTenant;
       // Store the alias for display purposes
       window.__tenantAlias = tenant;
+      console.log('CLIENT RESOLVED: tenant=' + tenant + ' realTenant=' + realTenant + ' apiPrefix=' + window.__tenantApiPrefix + ' pathname=' + window.location.pathname);
 
       // ── Patch fetch to prefix /api/ calls ──────────────────────────
       var _origFetch = window.fetch;

@@ -2249,7 +2249,7 @@ setTimeout(function _setupMultiTenant() {
     if (!urlSlug) urlSlug = tenantId;
     // base href uses the URL slug (so assets load from the alias path)
     // __tenant and __tenantApiPrefix use the slug too (the alias gateway routes it to the right router)
-    var injection = '<base href="/' + urlSlug + '/"><script>window.__tenant="' + tenantId + '";window.__tenantApiPrefix="/' + urlSlug + '";</script>';
+    var injection = '<base href="/' + urlSlug + '/"><script>window.__tenant="' + tenantId + '";window.__tenantApiPrefix="/' + urlSlug + '";console.log("SERVER INJECTED: tenant=" + window.__tenant + " apiPrefix=" + window.__tenantApiPrefix);</script>';
     var html = _mtIndexHtml.replace('<head>', '<head>' + injection);
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(html);
