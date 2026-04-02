@@ -469,8 +469,13 @@ function registerFreemiumRoutes(app) {
     }
 
     try {
-      // Check if email exists
-      const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      // Check if email exists (scoped to same tenant)
+      let existing;
+      if (tenant) {
+        [existing] = await db.query('SELECT id FROM users WHERE email = ? AND tenant = ?', [email.toLowerCase().trim(), tenant]);
+      } else {
+        [existing] = await db.query('SELECT id FROM users WHERE email = ? AND (tenant IS NULL OR tenant = ?)', [email.toLowerCase().trim(), '']);
+      }
       if (existing.length > 0) return res.status(409).json({ error: 'Email already registered' });
 
       const hash = hashPassword(password);
@@ -1148,14 +1153,20 @@ function registerFreemiumRoutes(app) {
     const db = await getPool();
     if (!db) return res.status(503).json({ error: 'Database not configured yet. The admin needs to set up the MySQL connection in the admin panel (Database tab) and click Init Tables.' });
 
+    const tenantVal = tenant || null;
     try {
-      const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      // Check for duplicate email scoped to the same tenant
+      let existing;
+      if (tenantVal) {
+        [existing] = await db.query('SELECT id FROM users WHERE email = ? AND tenant = ?', [email.toLowerCase().trim(), tenantVal]);
+      } else {
+        [existing] = await db.query('SELECT id FROM users WHERE email = ? AND (tenant IS NULL OR tenant = ?)', [email.toLowerCase().trim(), '']);
+      }
       if (existing.length > 0) return res.status(409).json({ error: 'Email already registered' });
 
       const hash = hashPassword(password);
       const monthReset = getMonthResetDate();
       const userPlan = plan || 'free';
-      const tenantVal = tenant || null;
 
       try {
         await db.query(

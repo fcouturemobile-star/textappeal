@@ -1467,8 +1467,15 @@ async function _doTranslate(retranslate) {
     });
 
     if (!r.ok) {
-      var errMsg = (r.data && r.data.error) ? r.data.error : 'Translation failed. Check LLM configuration.';
-      _qs('#pt-translation').innerHTML = '<span style="color:var(--pt-error);">' + _esc(errMsg) + '</span>';
+      if (r.status === 402 && r.data && r.data.error === 'limit_reached') {
+        _qs('#pt-translation').innerHTML = '<div style="color:var(--pt-orange);padding:16px;text-align:center">' +
+          '<div style="font-size:18px;font-weight:600;margin-bottom:8px">' + (r.data.message || 'Free request limit reached.') + '</div>' +
+          '<div style="font-size:14px;color:var(--pt-muted)">Usage: ' + (r.data.usage || '?') + ' / ' + (r.data.limit || 30) + ' requests this month</div>' +
+          '</div>';
+      } else {
+        var errMsg = (r.data && r.data.error) ? r.data.error : 'Translation failed. Check LLM configuration.';
+        _qs('#pt-translation').innerHTML = '<span style="color:var(--pt-error);">' + _esc(errMsg) + '</span>';
+      }
     } else {
       var d = r.data;
       _qs('#pt-translation').textContent = d.translation || '';

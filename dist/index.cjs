@@ -3172,6 +3172,31 @@ _ptRouter.post('/api/translate', async function(req, res) {
     if (!PT_LANG_COLS.hasOwnProperty(sourceLang)) return res.status(400).json({ error: 'Invalid sourceLang: ' + sourceLang });
     if (!PT_LANG_COLS.hasOwnProperty(targetLang)) return res.status(400).json({ error: 'Invalid targetLang: ' + targetLang });
 
+    // ── Freemium usage tracking ──
+    try {
+      var FM = require('../server/freemium.cjs');
+      var _ptDb = await FM.getPool();
+      if (_ptDb) {
+        var _ptUserToken = req.headers['x-user-token'];
+        if (_ptUserToken) {
+          var [_ptSess] = await _ptDb.query(
+            'SELECT s.user_id, u.plan, u.requests_this_month, u.subscription_status FROM user_sessions s JOIN users u ON s.user_id = u.id WHERE s.token = ? AND s.expires_at > ?',
+            [_ptUserToken, Date.now()]
+          );
+          if (_ptSess.length > 0) {
+            var _ptUser = _ptSess[0];
+            var [_ptSc] = await _ptDb.query('SELECT free_requests_per_month FROM stripe_config WHERE id = 1');
+            var _ptFreeLimit = (_ptSc[0] && _ptSc[0].free_requests_per_month) || 30;
+            if (_ptUser.plan === 'free' && _ptUser.subscription_status !== 'active' && _ptUser.requests_this_month >= _ptFreeLimit) {
+              return res.status(402).json({ error: 'limit_reached', message: 'You have used all ' + _ptFreeLimit + ' free requests this month. Please upgrade to continue.', usage: _ptUser.requests_this_month, limit: _ptFreeLimit });
+            }
+            await _ptDb.query('UPDATE users SET requests_this_month = requests_this_month + 1 WHERE id = ?', [_ptUser.user_id]);
+            await _ptDb.query('INSERT INTO usage_log (user_id, request_type) VALUES (?, ?)', [_ptUser.user_id, 'pt_translate']);
+          }
+        }
+      }
+    } catch(_ptUe) { console.warn('PT usage tracking:', _ptUe.message); }
+
     var translationCfg = _ptGetLLMConfig('translation');
     if (!translationCfg.apiKey) return res.status(500).json({ error: 'Translation LLM not configured. Please set API key in Admin panel.' });
 
