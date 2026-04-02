@@ -1509,7 +1509,9 @@ var _isTranslating = false;
 
 async function _doTranslate(retranslate) {
   if (_isTranslating) return;
-  var text = (_sourceEl.textContent || '').trim();
+  var text = (_sourceEl.innerHTML || '').trim();
+  // Strip empty editor placeholder content
+  if (text === '<br>' || text.replace(/<br\s*\/?>/g, '').trim() === '') text = '';
   if (!text) { alert('Please enter text to translate.'); return; }
 
   _isTranslating = true;
@@ -1543,11 +1545,11 @@ async function _doTranslate(retranslate) {
       }
     } else {
       var d = r.data;
-      _qs('#pt-translation').textContent = d.translation || '';
+      _qs('#pt-translation').innerHTML = d.translation || '';
       _qs('#pt-copy-translation').style.display = 'inline-block';
 
       if (d.backtranslation) {
-        _qs('#pt-backtranslation').textContent = d.backtranslation;
+        _qs('#pt-backtranslation').innerHTML = d.backtranslation;
         _qs('#pt-copy-backtranslation').style.display = 'inline-block';
         _qs('#pt-backtranslation-footer').style.display = 'flex';
         _qs('#pt-backtranslation-disclaimer').style.display = 'block';

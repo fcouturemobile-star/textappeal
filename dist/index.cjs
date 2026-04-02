@@ -2851,10 +2851,10 @@ var PT_LANG_NAMES = {
 
 // ── Plain language system prompts ─────────────────────────────────────────
 var PT_SYSTEM_PROMPTS = {
-  'en-US': 'You are translating into plain US English for blue-collar logistics workers. Use short sentences, common words, active voice. Avoid jargon unless it is standard industry terminology. Be direct and clear. Return only the translated text with no explanations or meta-commentary.',
-  'fr-CA': 'Vous traduisez en français canadien simple pour des travailleurs de la logistique. Utilisez des phrases courtes, des mots courants, la voix active. Évitez le jargon sauf la terminologie standard de l\'industrie. Soyez direct et clair. Retournez uniquement le texte traduit, sans explications.',
-  'es-419': 'Estás traduciendo al español latinoamericano sencillo para trabajadores de logística. Usa oraciones cortas, palabras comunes, voz activa. Evita la jerga excepto la terminología estándar de la industria. Sé directo y claro. Devuelve solo el texto traducido, sin explicaciones.',
-  'pt-BR': 'Você está traduzindo para português brasileiro simples para trabalhadores de logística. Use frases curtas, palavras comuns, voz ativa. Evite jargão exceto a terminologia padrão da indústria. Seja direto e claro. Retorne apenas o texto traduzido, sem explicações.'
+  'en-US': 'You are translating into plain US English for blue-collar logistics workers. Use short sentences, common words, active voice. Avoid jargon unless it is standard industry terminology. Be direct and clear. Preserve all HTML formatting tags (bold, italic, headings, lists, paragraphs). Return only the translated text with no explanations or meta-commentary.',
+  'fr-CA': 'Vous traduisez en français canadien simple pour des travailleurs de la logistique. Utilisez des phrases courtes, des mots courants, la voix active. Évitez le jargon sauf la terminologie standard de l\'industrie. Soyez direct et clair. Conservez toutes les balises HTML de mise en forme (gras, italique, titres, listes, paragraphes). Retournez uniquement le texte traduit, sans explications.',
+  'es-419': 'Estás traduciendo al español latinoamericano sencillo para trabajadores de logística. Usa oraciones cortas, palabras comunes, voz activa. Evita la jerga excepto la terminología estándar de la industria. Sé directo y claro. Conserva todas las etiquetas HTML de formato (negrita, cursiva, títulos, listas, párrafos). Devuelve solo el texto traducido, sin explicaciones.',
+  'pt-BR': 'Você está traduzindo para português brasileiro simples para trabalhadores de logística. Use frases curtas, palavras comuns, voz ativa. Evite jargão exceto a terminologia padrão da indústria. Seja direto e claro. Preserve todas as tags HTML de formatação (negrito, itálico, títulos, listas, parágrafos). Retorne apenas o texto traduzido, sem explicações.'
 };
 
 // ── In-memory data ────────────────────────────────────────────────────────
@@ -3351,7 +3351,7 @@ _ptRouter.post('/api/translate', async function(req, res) {
             btCtx += '"' + glossaryMatches[_bg1].target + '" \u2192 "' + glossaryMatches[_bg1].source + '"\n';
           }
         }
-        var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.' + btCtx;
+        var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Preserve all HTML formatting tags. Return only the translation, no explanations.' + btCtx;
         backtranslation = await _ptCallLLM(btSystem, translation, btCfg);
         backtranslationLlmLabel = _ptLLMLabel(btCfg);
       }
@@ -3412,7 +3412,7 @@ _ptRouter.post('/api/retranslate', async function(req, res) {
             btCtx2 += '"' + glossaryMatches[_bg2].target + '" \u2192 "' + glossaryMatches[_bg2].source + '"\n';
           }
         }
-        var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.' + btCtx2;
+        var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Preserve all HTML formatting tags. Return only the translation, no explanations.' + btCtx2;
         backtranslation = await _ptCallLLM(btSystem, translation, btCfg);
         backtranslationLlmLabel = _ptLLMLabel(btCfg);
       }
