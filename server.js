@@ -1,4 +1,4 @@
-// Build: 2026-04-02T06:37 EDT - logo spacing + hover
+// Build: 2026-04-02T06:42 EDT - members field fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

@@ -2005,15 +2005,15 @@ async function _loadMembers() {
   var wrap = _qs('#pt-members-list');
   wrap.innerHTML = '<p style="color:var(--pt-muted);font-size:0.875rem;">Loading…</p>';
   var r = await _apiAdmin('/admin/members');
-  if (!r.ok) { wrap.innerHTML = '<p style="color:var(--pt-error);">Could not load members.</p>'; return; }
+  if (!r.ok) { wrap.innerHTML = '<p style="color:var(--pt-error);">Could not load members: ' + _esc((r.data && r.data.error) || 'Error ' + r.status) + '</p>'; return; }
   var members = Array.isArray(r.data) ? r.data : (r.data.users || r.data.members || []);
   if (!members.length) { wrap.innerHTML = '<p style="color:var(--pt-muted);">No members yet.</p>'; return; }
   var html = '<table class="pt-doc-table"><thead><tr><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
   members.forEach(function(m) {
-    var date = m.createdAt ? new Date(m.createdAt).toLocaleDateString() : '?';
+    var date = (m.created_at || m.createdAt) ? new Date(m.created_at || m.createdAt).toLocaleDateString() : '?';
     html += '<tr>';
     html += '<td>' + _esc(m.email || '') + '</td>';
-    html += '<td>' + _esc(m.status || m.subscriptionStatus || 'free') + '</td>';
+    html += '<td>' + _esc(m.plan || m.status || m.subscription_status || m.subscriptionStatus || 'free') + '</td>';
     html += '<td>' + date + '</td>';
     html += '<td><button onclick="window._ptDeleteMember(\'' + _esc(String(m.id || m._id)) + '\')" style="background:none;border:none;color:var(--pt-error);cursor:pointer;">Delete</button></td>';
     html += '</tr>';
