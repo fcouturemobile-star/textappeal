@@ -1,4 +1,4 @@
-// Build: 2026-04-01T19:20 EDT - Purple Tongue added
+// Build: 2026-04-01T20:36 EDT - BT glossary fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

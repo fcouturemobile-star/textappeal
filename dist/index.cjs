@@ -3184,13 +3184,21 @@ _ptRouter.post('/api/translate', async function(req, res) {
 
     var translation = await _ptCallLLM(systemPrompt, userMsg, translationCfg);
 
-    // 5. Backtranslation
+    // 5. Backtranslation (with glossary in reverse direction)
     var backtranslation = '';
     var backtranslationLlmLabel = '';
     try {
       var btCfg = _ptGetLLMConfig('backtranslation');
       if (btCfg && btCfg.apiKey) {
-        var btSystem = 'Translate the following text back into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.';
+        var btGlossaryMatches = _ptMatchGlossary(translation, targetLang, sourceLang);
+        var btCtx = '';
+        if (btGlossaryMatches.length > 0) {
+          btCtx = '\n\nMANDATORY GLOSSARY \u2014 USE THESE EXACT TRANSLATIONS (NON-NEGOTIABLE):\n';
+          for (var _bg1 = 0; _bg1 < btGlossaryMatches.length; _bg1++) {
+            btCtx += '"' + btGlossaryMatches[_bg1].source + '" \u2192 "' + btGlossaryMatches[_bg1].target + '"\n';
+          }
+        }
+        var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.' + btCtx;
         backtranslation = await _ptCallLLM(btSystem, translation, btCfg);
         backtranslationLlmLabel = _ptLLMLabel(btCfg);
       }
@@ -3212,7 +3220,7 @@ _ptRouter.post('/api/translate', async function(req, res) {
   }
 });
 
-// ── Retranslate (slightly higher temperature) ─────────────────────────────
+// \u2500\u2500 Retranslate (slightly higher temperature) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 _ptRouter.post('/api/retranslate', async function(req, res) {
   try {
     var text = req.body.text;
@@ -3241,7 +3249,15 @@ _ptRouter.post('/api/retranslate', async function(req, res) {
     try {
       var btCfg = _ptGetLLMConfig('backtranslation');
       if (btCfg && btCfg.apiKey) {
-        var btSystem = 'Translate the following text back into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.';
+        var btGlossaryMatches2 = _ptMatchGlossary(translation, targetLang, sourceLang);
+        var btCtx2 = '';
+        if (btGlossaryMatches2.length > 0) {
+          btCtx2 = '\n\nMANDATORY GLOSSARY \u2014 USE THESE EXACT TRANSLATIONS (NON-NEGOTIABLE):\n';
+          for (var _bg2 = 0; _bg2 < btGlossaryMatches2.length; _bg2++) {
+            btCtx2 += '"' + btGlossaryMatches2[_bg2].source + '" \u2192 "' + btGlossaryMatches2[_bg2].target + '"\n';
+          }
+        }
+        var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.' + btCtx2;
         backtranslation = await _ptCallLLM(btSystem, translation, btCfg);
         backtranslationLlmLabel = _ptLLMLabel(btCfg);
       }
