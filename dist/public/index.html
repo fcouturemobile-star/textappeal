@@ -49,8 +49,15 @@
       window.fetch = function(input, init) {
         var url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
         var _apiPfx = '/' + realTenant;
+        // Always inject x-tenant header on API calls for proper member scoping
+        if (typeof url === 'string' && url.indexOf('/api/') !== -1) {
+          if (!init) init = {};
+          if (!init.headers) init.headers = {};
+          if (typeof init.headers === 'object' && !(init.headers instanceof Headers)) {
+            init.headers['x-tenant'] = realTenant;
+          }
+        }
         if (typeof url === 'string' && url.startsWith('/') && !url.startsWith(_apiPfx + '/') && !url.startsWith(prefix + '/') && !url.startsWith(_apiPfx + '?')) {
-          // Prefix API calls with the real tenant path (not the alias)
           url = _apiPfx + url;
           if (typeof input === 'string') {
             input = url;
