@@ -1173,19 +1173,7 @@ function injectAccountButton() {
     const appContainer = root.querySelector('[class*="100dvh"]') || root.querySelector('[class*="flex-col"]');
     if (!appContainer) return;
 
-    const cta = document.createElement("div");
-    cta.id = "ta-hero-cta";
-    cta.innerHTML = '<div class="ta-hero-cta-inner">' +
-      '<button class="ta-btn ta-btn-hero" onclick="window.__taFreemium.showAuthModal(\'register\')">' +
-      '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>' +
-      ' ' + __t('createFreeAccount') + '</button>' +
-      '<a href="' + getSiteLinkHref() + '" class="ta-btn ta-btn-hero ta-site-link" style="background:transparent;border:2px solid hsl(var(--primary));color:hsl(var(--primary));text-decoration:none;display:inline-flex;align-items:center;gap:6px">' +
-      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m22 5-10 7L2 5"/></svg>' +
-      ' ' + __t('getCustomSite') + '</a>' +
-      '<span class="ta-hero-subtitle">' + freemiumConfig.freeRequestsPerMonth + ' ' + __t('freeRequests') + ' - ' + __t('noCreditCard') + '</span>' +
-      '</div>';
-    // Insert inside the 100dvh container, before the header
-    appContainer.insertBefore(cta, appContainer.firstChild);
+    // Hero CTA buttons removed — already in the user bar
   }, 500);
 }
 
@@ -3679,11 +3667,7 @@ function updateTMPaneVisibility() {
     // Don't duplicate
     if (panel.querySelector('.ta-zdr-notice')) return true;
 
-    var notice = document.createElement('div');
-    notice.className = 'ta-zdr-notice';
-    var lang = window.__taLang || 'en';
-    notice.innerHTML = (lang === 'fr') ? FR_TEXT : EN_TEXT;
-    panel.appendChild(notice);
+    // ZDR notice removed — already covered in the privacy policy
     return true;
   }
 

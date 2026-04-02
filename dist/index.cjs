@@ -3044,7 +3044,8 @@ async function _ptCallLLM(system, userMsg, llmCfg, tempOverride) {
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: userMsg }
-        ]
+        ],
+        provider: { zdr: true, data_collection: 'deny' }
       })
     });
     if (!r2.ok) { var errText2 = await r2.text(); throw new Error('LLM error ' + r2.status + ': ' + errText2); }
