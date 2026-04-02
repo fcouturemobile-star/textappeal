@@ -1,4 +1,4 @@
-// Build: 2026-04-02T07:18 EDT - safe config write
+// Build: 2026-04-02T07:26 EDT - PurpleTongue + disclaimers
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

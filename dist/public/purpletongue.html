@@ -78,7 +78,6 @@ a.pt-logo, a.pt-logo:hover { text-decoration: none !important; }
   display: flex;
   align-items: baseline;
   white-space: nowrap;
-  gap: 0.3em;
 }
 .pt-logo:hover { text-decoration: none !important; }
 .pt-logo:hover .pt-logo-text span { text-decoration: none !important; }
@@ -690,7 +689,7 @@ input[type="file"].pt-input { cursor: pointer; }
   <a href="/purpletongue" class="pt-logo">
 
     <div class="pt-logo-text">
-      <span>Purple</span><span>Tongue</span> <span style="font-weight:400;opacity:0.7">by</span> <a href="mailto:fcouture@voilatranslations.com" style="font-weight:700;color:inherit;text-decoration:underline;opacity:0.85" onclick="event.stopPropagation()">François COUTURE</a>
+      <span>Purple</span><span>Tongue</span><span style="font-weight:400;opacity:0.7;margin:0 0.3em">by</span><a href="mailto:fcouture@voilatranslations.com" style="font-weight:700;color:inherit;text-decoration:underline;opacity:0.85" onclick="event.stopPropagation()">François COUTURE</a>
     </div>
   </a>
 
@@ -764,6 +763,7 @@ input[type="file"].pt-input { cursor: pointer; }
           <span class="pt-llm-tag" id="pt-translation-llm-tag"></span>
           <button class="pt-btn-ghost" id="pt-retranslate-btn" style="padding:5px 12px;font-size:0.8rem;" data-i18n="retranslate">Retranslate</button>
         </div>
+        <div class="pt-disclaimer" id="pt-translation-disclaimer" style="display:none;padding:6px 12px;font-size:0.7rem;color:var(--pt-muted);border-top:1px solid var(--pt-border);text-align:center">AI is not infallible. For a professional solution, contact <a href="mailto:fcouture@voilatranslations.com" style="color:var(--pt-orange);text-decoration:underline">fcouture@voilatranslations.com</a></div>
       </div>
 
       <!-- PANE 3: BACKTRANSLATION -->
@@ -778,6 +778,7 @@ input[type="file"].pt-input { cursor: pointer; }
         <div class="pt-pane-footer" id="pt-backtranslation-footer" style="display:none;">
           <span class="pt-llm-tag" id="pt-backtranslation-llm-tag"></span>
         </div>
+        <div class="pt-disclaimer" id="pt-backtranslation-disclaimer" style="display:none;padding:6px 12px;font-size:0.7rem;color:var(--pt-muted);border-top:1px solid var(--pt-border);text-align:center">AI is not infallible. For a professional solution, contact <a href="mailto:fcouture@voilatranslations.com" style="color:var(--pt-orange);text-decoration:underline">fcouture@voilatranslations.com</a></div>
       </div>
 
     </div>
@@ -1548,6 +1549,7 @@ async function _doTranslate(retranslate) {
         _qs('#pt-backtranslation').textContent = d.backtranslation;
         _qs('#pt-copy-backtranslation').style.display = 'inline-block';
         _qs('#pt-backtranslation-footer').style.display = 'flex';
+        _qs('#pt-backtranslation-disclaimer').style.display = 'block';
         _qs('#pt-backtranslation-pane').classList.add('visible');
       } else {
         _qs('#pt-backtranslation').innerHTML = '<span style="color:var(--pt-muted);font-style:italic">' + (d.backtranslationSkipped || 'Backtranslation unavailable. Configure Backtranslation LLM in admin panel.') + '</span>';
@@ -1559,6 +1561,7 @@ async function _doTranslate(retranslate) {
       _qs('#pt-backtranslation-llm-tag').textContent = bllmTag;
 
       _qs('#pt-translation-footer').style.display = 'flex';
+      _qs('#pt-translation-disclaimer').style.display = 'block';
       _qs('#pt-retranslate-btn').style.display = 'inline-block';
     }
   } catch(e) {
