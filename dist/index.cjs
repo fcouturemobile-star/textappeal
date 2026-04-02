@@ -2931,90 +2931,65 @@ function _ptLoadTMX() {
 
 // ── Load admin config ─────────────────────────────────────────────────────
 function _ptLoadConfig() {
-  // Strategy: store PT config INSIDE the main TextAppeal admin-config.json
-  // under the key "purpleTongue". This file is KNOWN to persist on Hostinger.
+  // Load PT config from PT-specific files only. NEVER read from main TextAppeal config.
   var loaded = false;
+
+  // 1. Try PT home dir config
+  console.log('PT: Looking for config at: ' + PT_ADMIN_CONFIG_FILE);
   try {
-    var mainCfgPath = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'admin-config.json');
-    console.log('PT: Loading config from main TextAppeal config: ' + mainCfgPath);
-    if (_ptFs.existsSync(mainCfgPath)) {
-      var mainCfg = JSON.parse(_ptFs.readFileSync(mainCfgPath, 'utf8'));
-      if (mainCfg.purpleTongue && typeof mainCfg.purpleTongue === 'object') {
-        _ptAdminConfig = mainCfg.purpleTongue;
+    if (_ptFs.existsSync(PT_ADMIN_CONFIG_FILE)) {
+      var raw = _ptFs.readFileSync(PT_ADMIN_CONFIG_FILE, 'utf8');
+      var ptCfg = JSON.parse(raw);
+      if (ptCfg.translationLlm && ptCfg.translationLlm.apiKey) {
+        _ptAdminConfig = ptCfg;
         loaded = true;
-        console.log('PT: Config loaded from main config. Translation model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
+        console.log('PT: Config loaded from ' + PT_ADMIN_CONFIG_FILE + '. Model: ' + (ptCfg.translationLlm.model || '(not set)'));
       }
     }
-  } catch(e) { console.warn('PT: Error loading from main config:', e.message); }
+  } catch(e1) { console.warn('PT: Error reading PT config:', e1.message); }
 
-  // Fallback: try the PT-specific config file
-  if (!loaded || !(_ptAdminConfig.translationLlm && _ptAdminConfig.translationLlm.apiKey)) {
+  // 2. Try backup in parent dir
+  if (!loaded) {
     try {
-      if (_ptFs.existsSync(PT_ADMIN_CONFIG_FILE)) {
-        var raw = _ptFs.readFileSync(PT_ADMIN_CONFIG_FILE, 'utf8');
-        var ptCfg = JSON.parse(raw);
-        if (ptCfg.translationLlm && ptCfg.translationLlm.apiKey) {
-          _ptAdminConfig = ptCfg;
-          loaded = true;
-          console.log('PT: Config loaded from PT file. Translation model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
-        }
-      }
-    } catch(e2) {}
-  }
-
-  // Fallback: try backup
-  if (!loaded || !(_ptAdminConfig.translationLlm && _ptAdminConfig.translationLlm.apiKey)) {
-    try {
-      var backupPath = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'purpletongue-config-backup.json');
+      var backupPath = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'pt-config.json');
+      console.log('PT: Trying backup at: ' + backupPath);
       if (_ptFs.existsSync(backupPath)) {
         var backupCfg = JSON.parse(_ptFs.readFileSync(backupPath, 'utf8'));
         if (backupCfg.translationLlm && backupCfg.translationLlm.apiKey) {
           _ptAdminConfig = backupCfg;
           loaded = true;
-          console.log('PT: Config restored from backup');
+          console.log('PT: Config restored from backup. Model: ' + (backupCfg.translationLlm.model || '(not set)'));
+          // Re-save to primary
+          try {
+            _ptFs.mkdirSync(_ptPath.dirname(PT_ADMIN_CONFIG_FILE), { recursive: true });
+            _ptFs.writeFileSync(PT_ADMIN_CONFIG_FILE, JSON.stringify(_ptAdminConfig, null, 2));
+          } catch(re) {}
         }
       }
-    } catch(e3) {}
+    } catch(e2) {}
   }
 
   if (!loaded) {
-    console.log('PT: No config found anywhere, using defaults');
+    console.log('PT: No config found, using defaults');
     _ptAdminConfig = { translationLlm: {}, backtranslationLlm: {}, docMode: 'email', contactEmail: '' };
   }
 }
 
 function _ptSaveConfig() {
   try {
-    // Primary: save inside the main TextAppeal admin-config.json under "purpleTongue" key
-    // This file is KNOWN to persist on Hostinger (TextAppeal settings survive deploys)
-    // Save PT config into the main TextAppeal admin-config.json under "purpleTongue" key.
-    // CRITICAL: read the CURRENT file, only update the purpleTongue key, preserve everything else.
-    var mainCfgPath = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'admin-config.json');
-    try {
-      // Use the main app's in-memory config (Ga()) to avoid reading a stale file
-      var mainCfg;
-      try { mainCfg = JSON.parse(JSON.stringify(Ga())); } catch(ge) { mainCfg = {}; }
-      // If Ga() returned empty, read from disk as fallback
-      if (!mainCfg || Object.keys(mainCfg).length < 2) {
-        try { mainCfg = JSON.parse(_ptFs.readFileSync(mainCfgPath, 'utf8')); } catch(re) { mainCfg = {}; }
-      }
-      mainCfg.purpleTongue = _ptAdminConfig;
-      _ptFs.writeFileSync(mainCfgPath, JSON.stringify(mainCfg, null, 2));
-      // Also update the in-memory main config so Ga() stays current
-      try { he = mainCfg; } catch(he2) {}
-      console.log('PT: Config saved to main TextAppeal config. Translation model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
-    } catch(me) { console.error('PT: Error saving to main config:', me.message); }
-
-    // Also save to PT-specific file
+    // Save ONLY to PT-specific files. NEVER touch the main TextAppeal admin-config.json.
+    // Save to PT home dir
     _ptFs.mkdirSync(_ptPath.dirname(PT_ADMIN_CONFIG_FILE), { recursive: true });
     _ptFs.writeFileSync(PT_ADMIN_CONFIG_FILE, JSON.stringify(_ptAdminConfig, null, 2));
+    console.log('PT: Config saved to ' + PT_ADMIN_CONFIG_FILE + '. Model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
 
-    // Backup
+    // Backup to parent dir (survives if purpletongue subdir is wiped)
     try {
-      var _ptBackup = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'purpletongue-config-backup.json');
+      var _ptBackup = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'pt-config.json');
       _ptFs.writeFileSync(_ptBackup, JSON.stringify(_ptAdminConfig, null, 2));
+      console.log('PT: Backup saved to ' + _ptBackup);
     } catch(be) {}
-    // Also save to seed dir for packaging
+    // Also save to seed dir
     try {
       _ptFs.mkdirSync(PT_SEED_DIR, { recursive: true });
       _ptFs.writeFileSync(_ptPath.join(PT_SEED_DIR, 'admin-config.json'), JSON.stringify(_ptAdminConfig, null, 2));
