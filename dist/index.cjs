@@ -2973,6 +2973,15 @@ function _ptLoadConfig() {
     console.log('PT: No config found, using defaults');
     _ptAdminConfig = { translationLlm: {}, backtranslationLlm: {}, docMode: 'email', contactEmail: '' };
   }
+  // Restore custom prompts if saved
+  if (_ptAdminConfig.customPrompts) {
+    for (var _cpLang in _ptAdminConfig.customPrompts) {
+      if (PT_SYSTEM_PROMPTS[_cpLang]) {
+        PT_SYSTEM_PROMPTS[_cpLang] = _ptAdminConfig.customPrompts[_cpLang];
+        console.log('PT: Restored custom prompt for ' + _cpLang);
+      }
+    }
+  }
 }
 
 function _ptSaveConfig() {
@@ -3434,6 +3443,45 @@ _ptRouter.post('/api/admin/login', function(req, res) {
   // Also store in the main app's lt map so shared admin endpoints (Stripe, DB, SMTP) accept this token
   if (typeof lt !== 'undefined' && lt.set) lt.set(token, { username: username, expiresAt: Date.now() + 1440 * 60 * 1000 });
   return res.json({ token: token });
+});
+
+// ── Admin: Translation Prompts (GET/POST/reset) ─────────────────────
+_ptRouter.get('/api/admin/prompts', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var lang = req.query.lang || 'en-US';
+  // Check if admin has customized this prompt
+  var custom = (_ptAdminConfig.customPrompts || {})[lang];
+  var prompt = custom || PT_SYSTEM_PROMPTS[lang] || '';
+  res.json({ lang: lang, prompt: prompt, isCustom: !!custom });
+});
+_ptRouter.post('/api/admin/prompts', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var lang = req.body.lang;
+  var prompt = req.body.prompt;
+  if (!lang || !prompt) return res.status(400).json({ error: 'Missing lang or prompt' });
+  if (!PT_SYSTEM_PROMPTS[lang]) return res.status(400).json({ error: 'Invalid language: ' + lang });
+  if (!_ptAdminConfig.customPrompts) _ptAdminConfig.customPrompts = {};
+  _ptAdminConfig.customPrompts[lang] = prompt;
+  // Also update the live prompts so translations use it immediately
+  PT_SYSTEM_PROMPTS[lang] = prompt;
+  _ptSaveConfig();
+  res.json({ ok: true, message: 'Prompt saved for ' + lang });
+});
+_ptRouter.post('/api/admin/prompts/reset', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var lang = req.body.lang;
+  if (!lang) return res.status(400).json({ error: 'Missing lang' });
+  // Restore from defaults
+  var defaults = {
+    'en-US': 'You are translating into fluent, natural US English for logistics workers. Write in a way that is pleasant to read and engaging. Use clear, everyday language with short to medium sentences and active voice. Aim for a smooth, conversational flow while keeping the meaning accurate. Avoid stiff or literal phrasing \u2014 rephrase freely for naturalness. Avoid jargon unless it is standard industry terminology. Preserve all HTML formatting tags (bold, italic, headings, lists, paragraphs). Return only the translated text with no explanations or meta-commentary.',
+    'fr-CA': 'Vous traduisez en fran\u00e7ais canadien fluide et naturel pour des travailleurs de la logistique. R\u00e9digez de mani\u00e8re agr\u00e9able \u00e0 lire et engageante. Utilisez un langage clair et courant, des phrases courtes \u00e0 moyennes et la voix active. Visez un style fluide et conversationnel tout en pr\u00e9servant le sens. \u00c9vitez les tournures rigides ou litt\u00e9rales \u2014 reformulez librement pour un r\u00e9sultat naturel. \u00c9vitez le jargon sauf la terminologie standard de l\'industrie. Conservez toutes les balises HTML de mise en forme (gras, italique, titres, listes, paragraphes). Retournez uniquement le texte traduit, sans explications.',
+    'es-419': 'Est\u00e1s traduciendo al espa\u00f1ol latinoamericano fluido y natural para trabajadores de log\u00edstica. Escribe de manera agradable de leer y atractiva. Usa un lenguaje claro y cotidiano, oraciones cortas a medianas y voz activa. Busca un estilo fluido y conversacional manteniendo el significado. Evita traducciones r\u00edgidas o literales \u2014 reformula libremente para lograr naturalidad. Evita la jerga excepto la terminolog\u00eda est\u00e1ndar de la industria. Conserva todas las etiquetas HTML de formato (negrita, cursiva, t\u00edtulos, listas, p\u00e1rrafos). Devuelve solo el texto traducido, sin explicaciones.',
+    'pt-BR': 'Voc\u00ea est\u00e1 traduzindo para portugu\u00eas brasileiro fluente e natural para trabalhadores de log\u00edstica. Escreva de forma agrad\u00e1vel de ler e envolvente. Use linguagem clara e cotidiana, frases curtas a m\u00e9dias e voz ativa. Busque um estilo fluido e conversacional mantendo o significado. Evite tradu\u00e7\u00f5es r\u00edgidas ou literais \u2014 reformule livremente para naturalidade. Evite jarg\u00e3o exceto a terminologia padr\u00e3o da ind\u00fastria. Preserve todas as tags HTML de formata\u00e7\u00e3o (negrito, it\u00e1lico, t\u00edtulos, listas, par\u00e1grafos). Retorne apenas o texto traduzido, sem explica\u00e7\u00f5es.'
+  };
+  if (_ptAdminConfig.customPrompts) delete _ptAdminConfig.customPrompts[lang];
+  PT_SYSTEM_PROMPTS[lang] = defaults[lang] || '';
+  _ptSaveConfig();
+  res.json({ ok: true, prompt: defaults[lang] || '' });
 });
 
 // ── Debug: show what config PT sees ─────────────────────────────

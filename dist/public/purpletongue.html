@@ -928,6 +928,7 @@ input[type="file"].pt-input { cursor: pointer; }
         <button class="pt-admin-nav-item" data-section="backtranslation-llm">Backtranslation LLM</button>
         <button class="pt-admin-nav-item" data-section="resources">Translation Resources</button>
         <button class="pt-admin-nav-item" data-section="documents">Document Queue</button>
+        <button class="pt-admin-nav-item" data-section="prompts">Translation Prompts</button>
         <button class="pt-admin-nav-item" data-section="doc-mode">Document Mode</button>
         <button class="pt-admin-nav-item" data-section="members">Members</button>
         <button class="pt-admin-nav-item" data-section="stripe">Stripe & Billing</button>
@@ -1039,6 +1040,29 @@ input[type="file"].pt-input { cursor: pointer; }
         </div>
 
         <!-- Document Mode -->
+        <div class="pt-admin-section" id="pt-section-prompts">
+          <h2>Translation Prompts</h2>
+          <p style="color:var(--pt-muted);font-size:0.85rem;margin-bottom:16px;">Edit the system prompt sent to the LLM for each target language. These control the translation style and tone.</p>
+          <div id="pt-prompts-alert" class="pt-alert"></div>
+          <div class="pt-form-group">
+            <label>Target Language</label>
+            <select class="pt-input" id="pt-prompt-lang">
+              <option value="en-US">[US] English</option>
+              <option value="fr-CA">[CA] French</option>
+              <option value="es-419">[LA] Spanish</option>
+              <option value="pt-BR">[BR] Portuguese</option>
+            </select>
+          </div>
+          <div class="pt-form-group">
+            <label>System Prompt</label>
+            <textarea class="pt-input" id="pt-prompt-text" rows="10" style="font-family:monospace;font-size:0.8rem;line-height:1.5;resize:vertical"></textarea>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="pt-btn" id="pt-prompt-save">Save Prompt</button>
+            <button class="pt-btn-ghost" id="pt-prompt-reset">Reset to Default</button>
+          </div>
+        </div>
+
         <div class="pt-admin-section" id="pt-section-doc-mode">
           <h2>Document Translation Mode</h2>
           <div id="pt-docmode-alert" class="pt-alert"></div>
@@ -2106,6 +2130,46 @@ _qs('#pt-db-init').addEventListener('click', async function() {
 });
 
 // ── SMTP ──────────────────────────────────────────────────────────────────
+// ── Translation Prompts ────────────────────────────────────────────────────
+var _ptPromptCache = {};
+_qs('#pt-prompt-lang').addEventListener('change', async function() {
+  var lang = this.value;
+  if (_ptPromptCache[lang]) { _qs('#pt-prompt-text').value = _ptPromptCache[lang]; return; }
+  var r = await _apiAdmin('/admin/prompts?lang=' + encodeURIComponent(lang));
+  if (r.ok && r.data.prompt) {
+    _ptPromptCache[lang] = r.data.prompt;
+    _qs('#pt-prompt-text').value = r.data.prompt;
+  }
+});
+// Auto-load first language on section open
+document.querySelectorAll('.pt-admin-nav-item').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    if (this.dataset.section === 'prompts' && !_qs('#pt-prompt-text').value) {
+      _qs('#pt-prompt-lang').dispatchEvent(new Event('change'));
+    }
+  });
+});
+_qs('#pt-prompt-save').addEventListener('click', async function() {
+  var lang = _qs('#pt-prompt-lang').value;
+  var prompt = _qs('#pt-prompt-text').value.trim();
+  if (!prompt) { _showAlert(_qs('#pt-prompts-alert'), 'Prompt cannot be empty.', 'error'); return; }
+  var r = await _apiAdmin('/admin/prompts', { method: 'POST', body: JSON.stringify({ lang: lang, prompt: prompt }) });
+  _showAlert(_qs('#pt-prompts-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
+  if (r.ok) _ptPromptCache[lang] = prompt;
+});
+_qs('#pt-prompt-reset').addEventListener('click', async function() {
+  var lang = _qs('#pt-prompt-lang').value;
+  if (!confirm('Reset the ' + lang + ' prompt to the built-in default?')) return;
+  var r = await _apiAdmin('/admin/prompts/reset', { method: 'POST', body: JSON.stringify({ lang: lang }) });
+  if (r.ok && r.data.prompt) {
+    _qs('#pt-prompt-text').value = r.data.prompt;
+    _ptPromptCache[lang] = r.data.prompt;
+    _showAlert(_qs('#pt-prompts-alert'), 'Reset to default.', 'success');
+  } else {
+    _showAlert(_qs('#pt-prompts-alert'), r.data.error || 'Reset failed.', 'error');
+  }
+});
+
 _qs('#pt-smtp-save').addEventListener('click', async function() {
   var payload = {
     host: _qs('#pt-smtp-host').value.trim(),
