@@ -2967,11 +2967,8 @@ function _ptGetLLMConfig(which) {
 function _ptLLMLabel(cfg) {
   if (!cfg) return '';
   var m = cfg.model || '';
-  if (m.indexOf('claude') !== -1) return 'Claude';
-  if (m.indexOf('gpt') !== -1) return 'GPT';
-  if (m.indexOf('llama') !== -1) return 'Llama';
-  if (m.indexOf('gemini') !== -1) return 'Gemini';
-  if (m.indexOf('mistral') !== -1) return 'Mistral';
+  // Return the actual model ID for clarity (e.g., 'anthropic/claude-sonnet-4-6' or 'openai/gpt-oss-120b')
+  if (m) return m;
   return cfg.providerType || 'AI';
 }
 
