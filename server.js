@@ -1,4 +1,4 @@
-// Build: 2026-04-01T22:06 EDT - SMTP error details
+// Build: 2026-04-01T22:09 EDT - config persistence debug
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

@@ -2902,10 +2902,16 @@ function _ptLoadTMX() {
 
 // ── Load admin config ─────────────────────────────────────────────────────
 function _ptLoadConfig() {
+  console.log('PT: Loading config from: ' + PT_ADMIN_CONFIG_FILE);
+  console.log('PT: Config file exists: ' + _ptFs.existsSync(PT_ADMIN_CONFIG_FILE));
   try {
     if (_ptFs.existsSync(PT_ADMIN_CONFIG_FILE)) {
-      _ptAdminConfig = JSON.parse(_ptFs.readFileSync(PT_ADMIN_CONFIG_FILE, 'utf8'));
+      var raw = _ptFs.readFileSync(PT_ADMIN_CONFIG_FILE, 'utf8');
+      _ptAdminConfig = JSON.parse(raw);
+      console.log('PT: Config loaded. Translation LLM model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
+      console.log('PT: Backtranslation LLM model: ' + ((_ptAdminConfig.backtranslationLlm || {}).model || '(not set)'));
     } else {
+      console.log('PT: No config file found, using defaults');
       _ptAdminConfig = { translationLlm: {}, backtranslationLlm: {}, docMode: 'email', contactEmail: '' };
     }
   } catch(e) {
@@ -2916,7 +2922,9 @@ function _ptLoadConfig() {
 
 function _ptSaveConfig() {
   try {
+    console.log('PT: Saving config to: ' + PT_ADMIN_CONFIG_FILE);
     _ptFs.writeFileSync(PT_ADMIN_CONFIG_FILE, JSON.stringify(_ptAdminConfig, null, 2));
+    console.log('PT: Config saved. Translation model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
     // Also save to seed dir for packaging
     try {
       _ptFs.mkdirSync(PT_SEED_DIR, { recursive: true });
