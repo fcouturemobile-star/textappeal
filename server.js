@@ -1,4 +1,4 @@
-// Build: 2026-04-01T22:31 EDT - quadrilingual UI
+// Build: 2026-04-01T22:45 EDT - mobile BT pane
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
