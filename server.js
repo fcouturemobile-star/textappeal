@@ -1,4 +1,4 @@
-// Build: 2026-04-01T20:36 EDT - BT glossary fix
+// Build: 2026-04-01T20:41 EDT - BT glossary v2
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

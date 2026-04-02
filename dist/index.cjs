@@ -3184,18 +3184,20 @@ _ptRouter.post('/api/translate', async function(req, res) {
 
     var translation = await _ptCallLLM(systemPrompt, userMsg, translationCfg);
 
-    // 5. Backtranslation (with glossary in reverse direction)
+    // 5. Backtranslation (reuse the forward glossary matches, reversed)
     var backtranslation = '';
     var backtranslationLlmLabel = '';
     try {
       var btCfg = _ptGetLLMConfig('backtranslation');
       if (btCfg && btCfg.apiKey) {
-        var btGlossaryMatches = _ptMatchGlossary(translation, targetLang, sourceLang);
+        // Reuse the glossary matches from the forward translation, but reversed:
+        // The forward match found source-lang terms and their target-lang translations.
+        // For backtranslation, we tell the LLM: target-lang term → source-lang term.
         var btCtx = '';
-        if (btGlossaryMatches.length > 0) {
+        if (glossaryMatches.length > 0) {
           btCtx = '\n\nMANDATORY GLOSSARY \u2014 USE THESE EXACT TRANSLATIONS (NON-NEGOTIABLE):\n';
-          for (var _bg1 = 0; _bg1 < btGlossaryMatches.length; _bg1++) {
-            btCtx += '"' + btGlossaryMatches[_bg1].source + '" \u2192 "' + btGlossaryMatches[_bg1].target + '"\n';
+          for (var _bg1 = 0; _bg1 < glossaryMatches.length; _bg1++) {
+            btCtx += '"' + glossaryMatches[_bg1].target + '" \u2192 "' + glossaryMatches[_bg1].source + '"\n';
           }
         }
         var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.' + btCtx;
@@ -3249,12 +3251,12 @@ _ptRouter.post('/api/retranslate', async function(req, res) {
     try {
       var btCfg = _ptGetLLMConfig('backtranslation');
       if (btCfg && btCfg.apiKey) {
-        var btGlossaryMatches2 = _ptMatchGlossary(translation, targetLang, sourceLang);
+        // Reuse forward glossary matches, reversed
         var btCtx2 = '';
-        if (btGlossaryMatches2.length > 0) {
+        if (glossaryMatches.length > 0) {
           btCtx2 = '\n\nMANDATORY GLOSSARY \u2014 USE THESE EXACT TRANSLATIONS (NON-NEGOTIABLE):\n';
-          for (var _bg2 = 0; _bg2 < btGlossaryMatches2.length; _bg2++) {
-            btCtx2 += '"' + btGlossaryMatches2[_bg2].source + '" \u2192 "' + btGlossaryMatches2[_bg2].target + '"\n';
+          for (var _bg2 = 0; _bg2 < glossaryMatches.length; _bg2++) {
+            btCtx2 += '"' + glossaryMatches[_bg2].target + '" \u2192 "' + glossaryMatches[_bg2].source + '"\n';
           }
         }
         var btSystem = 'Translate the following text into ' + PT_LANG_NAMES[sourceLang] + '. Return only the translation, no explanations.' + btCtx2;
