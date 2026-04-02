@@ -1,4 +1,4 @@
-// Build: 2026-04-02T06:33 EDT - balanced spacing
+// Build: 2026-04-02T06:37 EDT - logo spacing + hover
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
