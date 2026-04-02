@@ -1774,7 +1774,23 @@ _loadSplashMessages();
 
 // Splash API: public GET (for splash screen) and admin GET/POST (for editing)
 ma.get("/api/splash-messages", function(req, res) {
-  res.json(_splashMessages);
+  var cfg = Ga();
+  res.json(Object.assign({}, _splashMessages, { enabled: cfg.splashEnabled === true }));
+});
+ma.get("/api/admin/splash-enabled", function(req, res) {
+  var token = req.headers["x-admin-token"];
+  if (!token || !lt.has(token)) return res.status(401).json({ error: "Unauthorized" });
+  var cfg = Ga();
+  res.json({ enabled: cfg.splashEnabled === true });
+});
+ma.post("/api/admin/splash-enabled", function(req, res) {
+  var token = req.headers["x-admin-token"];
+  if (!token || !lt.has(token)) return res.status(401).json({ error: "Unauthorized" });
+  var cfg = Ga();
+  cfg.splashEnabled = !!req.body.enabled;
+  he = cfg;
+  pt();
+  res.json({ ok: true, enabled: cfg.splashEnabled });
 });
 ma.get("/api/admin/splash-messages", function(req, res) {
   var token = req.headers["x-admin-token"];
@@ -2700,6 +2716,7 @@ setTimeout(function _setupMultiTenant() {
       });
 
       var _sharedAdminPaths = [
+        '/api/admin/splash-enabled',
         '/api/admin/stripe-config',
         '/api/admin/db-config',
         '/api/admin/db-init',

@@ -1,4 +1,4 @@
-// Build: 2026-04-02T05:55 EDT - cache bust v2
+// Build: 2026-04-02T06:01 EDT - splash toggle
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
