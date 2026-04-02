@@ -1188,6 +1188,20 @@ function registerFreemiumRoutes(app) {
     }
   });
 
+  // ── Admin: Debug user lookup (temporary diagnostic) ──
+  app.get('/api/admin/debug-user', async (req, res) => {
+    const adminToken = req.headers['x-admin-token'];
+    if (!adminToken) return res.status(401).json({ error: 'Unauthorized' });
+    const email = req.query.email;
+    if (!email) return res.status(400).json({ error: 'email query param required' });
+    const db = await getPool();
+    if (!db) return res.status(503).json({ error: 'No DB' });
+    try {
+      const [rows] = await db.query('SELECT id, email, tenant, is_active, email_verified, plan, display_name FROM users WHERE email = ?', [email.toLowerCase().trim()]);
+      return res.json({ email: email.toLowerCase().trim(), found: rows.length, rows: rows });
+    } catch(e) { return res.status(500).json({ error: e.message }); }
+  });
+
   // ── Admin: Import members from CSV ──
   // CSV format: First name, Last name, Email, Password
   app.post('/api/admin/import-members', async (req, res) => {

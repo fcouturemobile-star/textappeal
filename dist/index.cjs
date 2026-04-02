@@ -3527,6 +3527,7 @@ _ptRouter.delete('/api/admin/documents/:id', function(req, res) {
 
 // ── Admin: proxy shared endpoints to main app ─────────────────────────────
 var _ptSharedAdminPaths = [
+  '/api/admin/debug-user',
   '/api/admin/stripe-config',
   '/api/admin/db-config',
   '/api/admin/db-init',

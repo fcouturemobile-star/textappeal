@@ -1,4 +1,4 @@
-// Build: 2026-04-01T21:19 EDT - tenant-scoped email check
+// Build: 2026-04-01T21:24 EDT - debug + tenant email scope
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
