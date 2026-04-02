@@ -3461,6 +3461,25 @@ _ptRouter.post('/api/admin/login', function(req, res) {
   return res.json({ token: token });
 });
 
+// ── Debug: show what config PT sees ─────────────────────────────
+_ptRouter.get('/api/admin/debug-config', function(req, res) {
+  if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });
+  var mainCfgPath = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'admin-config.json');
+  var diskHasPT = false;
+  try {
+    var disk = JSON.parse(_ptFs.readFileSync(mainCfgPath, 'utf8'));
+    diskHasPT = !!(disk.purpleTongue && disk.purpleTongue.translationLlm);
+  } catch(e) {}
+  var memHasPT = false;
+  try { var mem = Ga(); memHasPT = !!(mem.purpleTongue && mem.purpleTongue.translationLlm); } catch(e) {}
+  res.json({
+    ptAdminConfig: { hasTranslationLlm: !!(_ptAdminConfig.translationLlm && _ptAdminConfig.translationLlm.model), translationModel: (_ptAdminConfig.translationLlm || {}).model || '(none)', hasBtLlm: !!(_ptAdminConfig.backtranslationLlm && _ptAdminConfig.backtranslationLlm.model) },
+    mainConfigDisk: { hasPurpleTongueKey: diskHasPT, path: mainCfgPath },
+    mainConfigMemory: { hasPurpleTongueKey: memHasPT },
+    ptConfigFile: { exists: _ptFs.existsSync(PT_ADMIN_CONFIG_FILE), path: PT_ADMIN_CONFIG_FILE }
+  });
+});
+
 // ── Admin: Models list (fetch from OpenRouter/etc) ────────────────────────
 _ptRouter.get('/api/admin/models', async function(req, res) {
   if (!_ptCheckAdminToken(req)) return res.status(401).json({ error: 'Unauthorized' });

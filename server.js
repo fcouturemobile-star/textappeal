@@ -1,4 +1,4 @@
-// Build: 2026-04-02T07:37 EDT - scrollable panes
+// Build: 2026-04-02T07:40 EDT - PT config debug
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
