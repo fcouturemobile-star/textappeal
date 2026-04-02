@@ -1,4 +1,4 @@
-// Build: 2026-04-01T21:27 EDT - email+tenant unique constraint
+// Build: 2026-04-01T21:32 EDT - simplified PT admin auth
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
