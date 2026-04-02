@@ -1166,6 +1166,7 @@ input[type="file"].pt-input { cursor: pointer; }
           </div>
           <div style="display:flex;gap:10px;flex-wrap:wrap;">
             <button class="pt-btn" id="pt-smtp-save">Save SMTP Config</button>
+            <input type="email" class="pt-input" id="pt-smtp-test-email" placeholder="Test recipient email" style="display:inline-block;width:250px;margin-right:8px;font-size:13px;padding:6px 10px;">
             <button class="pt-btn-ghost" id="pt-smtp-test">Send Test Email</button>
           </div>
         </div>
@@ -2048,7 +2049,9 @@ _qs('#pt-smtp-save').addEventListener('click', async function() {
   _showAlert(_qs('#pt-smtp-alert'), r.ok ? 'Saved!' : (r.data.error || 'Save failed.'), r.ok ? 'success' : 'error');
 });
 _qs('#pt-smtp-test').addEventListener('click', async function() {
-  var r = await _apiAdmin('/admin/smtp-test', { method: 'POST' });
+  var testEmail = _qs('#pt-smtp-test-email').value.trim();
+  if (!testEmail) { _showAlert(_qs('#pt-smtp-alert'), 'Enter a recipient email address for the test.', 'error'); return; }
+  var r = await _apiAdmin('/admin/smtp-test', { method: 'POST', body: JSON.stringify({ testEmail: testEmail }) });
   _showAlert(_qs('#pt-smtp-alert'), r.ok ? 'Test email sent!' : (r.data.error || 'Test failed.'), r.ok ? 'success' : 'error');
 });
 
