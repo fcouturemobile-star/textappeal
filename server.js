@@ -1,4 +1,4 @@
-// Build: 2026-04-01T21:24 EDT - debug + tenant email scope
+// Build: 2026-04-01T21:27 EDT - email+tenant unique constraint
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

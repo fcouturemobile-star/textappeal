@@ -245,11 +245,27 @@ async function getPool() {
         "ALTER TABLE users ADD COLUMN email_verified TINYINT(1) NOT NULL DEFAULT 1",
         "ALTER TABLE users ADD COLUMN verification_token VARCHAR(128) DEFAULT NULL",
         "ALTER TABLE users ADD COLUMN verification_expires BIGINT DEFAULT NULL",
-        "ALTER TABLE users ADD COLUMN tenant VARCHAR(20) DEFAULT NULL"
+        "ALTER TABLE users ADD COLUMN tenant VARCHAR(50) DEFAULT NULL"
       ];
       for (const stmt of alterStmts) {
         try { await pool.query(stmt); } catch(ae) { /* column already exists — ignore */ }
       }
+
+      // ── Migrate UNIQUE constraint: email alone → (email + tenant) ──
+      // This allows the same email on different tenant sites
+      try {
+        // Widen tenant column if it was created as VARCHAR(20) (too short for PURPLETONGUE)
+        await pool.query("ALTER TABLE users MODIFY COLUMN tenant VARCHAR(50) DEFAULT NULL");
+      } catch(ae) { /* ignore */ }
+      try {
+        // Drop the old UNIQUE on email alone
+        await pool.query("ALTER TABLE users DROP INDEX email");
+      } catch(ae) { /* index might not exist or already dropped */ }
+      try {
+        // Add composite unique on (email, tenant) — allows same email across different tenants
+        // MySQL treats NULL tenant values as distinct, so main-site users (tenant=NULL) won't conflict
+        await pool.query("ALTER TABLE users ADD UNIQUE INDEX idx_email_tenant (email, tenant)");
+      } catch(ae) { /* index might already exist */ }
 
       await pool.query(`CREATE TABLE IF NOT EXISTS email_verifications (
         id INT AUTO_INCREMENT PRIMARY KEY,
