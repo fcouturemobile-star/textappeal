@@ -1,4 +1,4 @@
-// Build: 2026-04-02T06:20 EDT - clickable author
+// Build: 2026-04-02T06:24 EDT - name inline fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
