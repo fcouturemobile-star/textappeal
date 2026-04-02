@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Purple Tongue — Quadrilingual Translation</title>
+<title>Purple Tongue by François COUTURE — Quadrilingual Translation</title>
 <style>
 :root {
   --pt-purple: #4D148C;
@@ -673,13 +673,10 @@ input[type="file"].pt-input { cursor: pointer; }
 <!-- ══════════════════════════════════════════════ HEADER -->
 <header class="pt-header">
   <a href="/purpletongue" class="pt-logo">
-    <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="Purple Tongue logo">
-      <circle cx="16" cy="16" r="15" fill="#4D148C" stroke="#FF6600" stroke-width="2"/>
-      <path d="M10 12 Q10 8 16 8 Q22 8 22 12 Q22 16 16 18 Q14 19 14 22 Q14 25 16 26" stroke="#FF6600" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-      <circle cx="16" cy="26" r="2" fill="#FF6600"/>
-    </svg>
+
     <div class="pt-logo-text">
       <span>Purple</span><span>Tongue</span>
+      <span style="font-size:11px;font-weight:400;opacity:0.7;margin-left:6px">by François COUTURE</span>
     </div>
   </a>
 
@@ -1276,7 +1273,7 @@ function _applyI18n() {
   document.querySelectorAll('[data-placeholder-i18n]').forEach(function(el) {
     el.setAttribute('data-placeholder', _t(el.getAttribute('data-placeholder-i18n')));
   });
-  document.title = 'Purple Tongue — ' + (_uiLang === 'fr' ? 'Traduction Quadrilingue' : 'Quadrilingual Translation');
+  document.title = 'Purple Tongue by François COUTURE — ' + (_uiLang === 'fr' ? 'Traduction Quadrilingue' : 'Quadrilingual Translation');
 }
 
 // ── Language names ─────────────────────────────────────────────────────────

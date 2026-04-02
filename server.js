@@ -1,4 +1,4 @@
-// Build: 2026-04-01T22:09 EDT - config persistence debug
+// Build: 2026-04-01T22:23 EDT - remove PT logo
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
