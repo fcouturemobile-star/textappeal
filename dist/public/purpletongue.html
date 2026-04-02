@@ -1991,13 +1991,19 @@ _qs('#pt-member-import-btn').addEventListener('click', function() {
 });
 _qs('#pt-import-csv-file').addEventListener('change', async function() {
   if (!this.files[0]) return;
-  var fd = new FormData(); fd.append('file', this.files[0]);
-  var r = await fetch(_apiBase() + '/admin/import-members', {
-    method: 'POST', headers: { 'x-admin-token': _adminToken }, body: fd
-  });
-  var data = await r.json();
-  _showAlert(_qs('#pt-members-alert'), r.ok ? ('Imported: ' + (data.imported || '?') + ' members.') : (data.error || 'Import failed.'), r.ok ? 'success' : 'error');
-  if (r.ok) _loadMembers();
+  var reader = new FileReader();
+  reader.onload = async function(e) {
+    var csvData = e.target.result;
+    var r = await _apiAdmin('/admin/import-members', {
+      method: 'POST',
+      body: JSON.stringify({ csvData: csvData })
+    });
+    var msg = r.ok ? (r.data.message || ('Imported: ' + (r.data.imported || '?') + ' members.')) : (r.data.error || 'Import failed.');
+    _showAlert(_qs('#pt-members-alert'), msg, r.ok ? 'success' : 'error');
+    if (r.ok) _loadMembers();
+  };
+  reader.readAsText(this.files[0]);
+  this.value = ''; // reset so same file can be re-imported
 });
 
 // ── Stripe ────────────────────────────────────────────────────────────────
