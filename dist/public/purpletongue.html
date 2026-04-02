@@ -1321,7 +1321,10 @@ async function _api(path, opts) {
 
 async function _apiAdmin(path, opts) {
   opts = opts || {};
-  opts.headers = Object.assign({ 'x-admin-token': _adminToken }, opts.headers || {});
+  // Always read the latest token from localStorage in case it was updated
+  var tok = _adminToken || localStorage.getItem('pt_admin_token');
+  if (tok && !_adminToken) _adminToken = tok;
+  opts.headers = Object.assign({ 'x-admin-token': tok || '' }, opts.headers || {});
   return _api(path, opts);
 }
 

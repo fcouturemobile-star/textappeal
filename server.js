@@ -1,4 +1,4 @@
-// Build: 2026-04-01T20:41 EDT - BT glossary v2
+// Build: 2026-04-01T20:50 EDT - admin auth fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

@@ -3303,6 +3303,8 @@ _ptRouter.post('/api/admin/login', function(req, res) {
   }
   var token = _ptGenToken();
   _ptAdminTokens.set(token, { expiresAt: Date.now() + 1440 * 60 * 1000 });
+  // Also store in the main app's lt map so shared admin endpoints (Stripe, DB, SMTP) accept this token
+  if (typeof lt !== 'undefined' && lt.set) lt.set(token, { username: username, expiresAt: Date.now() + 1440 * 60 * 1000 });
   return res.json({ token: token });
 });
 
