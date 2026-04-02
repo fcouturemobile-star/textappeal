@@ -1,4 +1,4 @@
-// Build: 2026-04-02T08:39 EDT - plan change + usage
+// Build: 2026-04-02T10:18 EDT - members debug
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

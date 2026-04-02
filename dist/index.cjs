@@ -2673,6 +2673,7 @@ setTimeout(function _setupMultiTenant() {
       // We forward these to the main app's handlers by rewriting the URL.
       // Members endpoint: tenant-scoped (inject x-tenant header)
       router.all('/api/admin/members', function(req, res) {
+        console.log('TENANT MEMBERS: tenantId=' + tenantId + ', baseUrl=' + req.baseUrl);
         req.headers['x-tenant'] = tenantId;
         var origUrl = req.url;
         var origBaseUrl = req.baseUrl;
