@@ -1,4 +1,4 @@
-// Build: 2026-04-02T08:33 EDT - editable prompts
+// Build: 2026-04-02T08:39 EDT - plan change + usage
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";

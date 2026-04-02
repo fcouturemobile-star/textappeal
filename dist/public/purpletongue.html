@@ -1558,7 +1558,12 @@ async function _doTranslate(retranslate) {
     });
 
     if (!r.ok) {
-      if (r.status === 402 && r.data && r.data.error === 'limit_reached') {
+      if (r.status === 401) {
+        _qs('#pt-translation').innerHTML = '<div style="color:var(--pt-orange);padding:16px;text-align:center">' +
+          '<div style="font-size:16px;font-weight:600;margin-bottom:8px">Please log in to translate</div>' +
+          '<button onclick="document.getElementById(\'pt-login-btn\').click()" style="background:var(--pt-orange);color:#fff;border:none;padding:8px 20px;border-radius:6px;cursor:pointer;font-size:14px">Log In</button>' +
+          '</div>';
+      } else if (r.status === 402 && r.data && r.data.error === 'limit_reached') {
         _qs('#pt-translation').innerHTML = '<div style="color:var(--pt-orange);padding:16px;text-align:center">' +
           '<div style="font-size:18px;font-weight:600;margin-bottom:8px">' + (r.data.message || 'Free request limit reached.') + '</div>' +
           '<div style="font-size:14px;color:var(--pt-muted)">Usage: ' + (r.data.usage || '?') + ' / ' + (r.data.limit || 30) + ' requests this month</div>' +
@@ -2039,19 +2044,38 @@ async function _loadMembers() {
   if (!r.ok) { wrap.innerHTML = '<p style="color:var(--pt-error);">Could not load members: ' + _esc((r.data && r.data.error) || 'Error ' + r.status) + '</p>'; return; }
   var members = Array.isArray(r.data) ? r.data : (r.data.users || r.data.members || []);
   if (!members.length) { wrap.innerHTML = '<p style="color:var(--pt-muted);">No members yet.</p>'; return; }
-  var html = '<table class="pt-doc-table"><thead><tr><th>Email</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
+  var html = '<table class="pt-doc-table"><thead><tr><th>Email</th><th>Name</th><th>Plan</th><th>Requests</th><th>Created</th><th>Actions</th></tr></thead><tbody>';
   members.forEach(function(m) {
     var date = (m.created_at || m.createdAt) ? new Date(m.created_at || m.createdAt).toLocaleDateString() : '?';
+    var plan = m.plan || 'free';
+    var usage = m.requests_this_month || m.requestsThisMonth || 0;
+    var mid = String(m.id || m._id);
     html += '<tr>';
-    html += '<td>' + _esc(m.email || '') + '</td>';
-    html += '<td>' + _esc(m.plan || m.status || m.subscription_status || m.subscriptionStatus || 'free') + '</td>';
-    html += '<td>' + date + '</td>';
-    html += '<td><button onclick="window._ptDeleteMember(\'' + _esc(String(m.id || m._id)) + '\')" style="background:none;border:none;color:var(--pt-error);cursor:pointer;">Delete</button></td>';
+    html += '<td style="font-size:0.82rem">' + _esc(m.email || '') + '</td>';
+    html += '<td style="font-size:0.82rem">' + _esc(m.display_name || m.displayName || '') + '</td>';
+    html += '<td><select onchange="window._ptChangePlan(\'' + _esc(mid) + '\',this.value)" style="background:var(--pt-input-bg);color:var(--pt-text);border:1px solid var(--pt-border);border-radius:4px;padding:2px 6px;font-size:0.78rem">' +
+      '<option value="free"' + (plan==='free'?' selected':'') + '>Free</option>' +
+      '<option value="pro"' + (plan==='pro'?' selected':'') + '>Pro</option>' +
+      '<option value="admin_free"' + (plan==='admin_free'?' selected':'') + '>Admin Free</option>' +
+      '</select></td>';
+    html += '<td style="text-align:center;font-size:0.82rem">' + usage + '</td>';
+    html += '<td style="font-size:0.78rem">' + date + '</td>';
+    html += '<td><button onclick="window._ptDeleteMember(\'' + _esc(mid) + '\')" style="background:none;border:none;color:var(--pt-error);cursor:pointer;font-size:0.78rem">Delete</button></td>';
     html += '</tr>';
   });
   html += '</tbody></table>';
   wrap.innerHTML = html;
 }
+
+window._ptChangePlan = async function(id, newPlan) {
+  var r = await _apiAdmin('/admin/members/' + id + '/plan', { method: 'PUT', body: JSON.stringify({ plan: newPlan }) });
+  if (r.ok) {
+    _showAlert(_qs('#pt-members-alert'), 'Plan updated to ' + newPlan, 'success');
+  } else {
+    _showAlert(_qs('#pt-members-alert'), r.data.error || 'Failed to update plan', 'error');
+    _loadMembers(); // reload to revert the dropdown
+  }
+};
 
 window._ptDeleteMember = async function(id) {
   if (!confirm('Delete this member?')) return;

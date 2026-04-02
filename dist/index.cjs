@@ -3267,6 +3267,10 @@ _ptRouter.get('/', _ptServeHtml);
 // ── Translate ─────────────────────────────────────────────────────────────
 _ptRouter.post('/api/translate', async function(req, res) {
   try {
+    // Require user authentication
+    var _ptUserToken = req.headers['x-user-token'];
+    if (!_ptUserToken) return res.status(401).json({ error: 'Please log in to translate.' });
+
     var text = req.body.text;
     var sourceLang = req.body.sourceLang || 'en-US';
     var targetLang = req.body.targetLang || 'fr-CA';
@@ -3362,6 +3366,10 @@ _ptRouter.post('/api/translate', async function(req, res) {
 // \u2500\u2500 Retranslate (slightly higher temperature) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
 _ptRouter.post('/api/retranslate', async function(req, res) {
   try {
+    // Require user authentication
+    var _ptUserToken2 = req.headers['x-user-token'];
+    if (!_ptUserToken2) return res.status(401).json({ error: 'Please log in to translate.' });
+
     var text = req.body.text;
     var sourceLang = req.body.sourceLang || 'en-US';
     var targetLang = req.body.targetLang || 'fr-CA';
@@ -3726,6 +3734,12 @@ _ptRouter.all('/api/admin/members', function(req, res) {
   ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
 });
 
+_ptRouter.all('/api/admin/members/:id/:action', function(req, res) {
+  req.headers['x-tenant'] = 'PURPLETONGUE';
+  var origUrl = req.url; var origBaseUrl = req.baseUrl;
+  req.url = '/api/admin/members/' + req.params.id + '/' + req.params.action; req.baseUrl = '';
+  ma.handle(req, res, function() { req.url = origUrl; req.baseUrl = origBaseUrl; res.status(404).json({ error: 'Not found' }); });
+});
 _ptRouter.all('/api/admin/members/:id', function(req, res) {
   req.headers['x-tenant'] = 'PURPLETONGUE';
   var origUrl = req.url; var origBaseUrl = req.baseUrl;
