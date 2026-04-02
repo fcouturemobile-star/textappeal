@@ -1548,8 +1548,9 @@ async function _doTranslate(retranslate) {
         _qs('#pt-backtranslation').textContent = d.backtranslation;
         _qs('#pt-copy-backtranslation').style.display = 'inline-block';
         _qs('#pt-backtranslation-footer').style.display = 'flex';
-        // Show on mobile
         _qs('#pt-backtranslation-pane').classList.add('visible');
+      } else {
+        _qs('#pt-backtranslation').innerHTML = '<span style="color:var(--pt-muted);font-style:italic">' + (d.backtranslationSkipped || 'Backtranslation unavailable. Configure Backtranslation LLM in admin panel.') + '</span>';
       }
 
       var llmTag = d.translationLlm ? 'via ' + d.translationLlm : '';

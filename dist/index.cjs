@@ -3304,6 +3304,8 @@ _ptRouter.post('/api/translate', async function(req, res) {
     var backtranslationLlmLabel = '';
     try {
       var btCfg = _ptGetLLMConfig('backtranslation');
+      console.log('PT BT config:', JSON.stringify({ hasConfig: !!btCfg, hasKey: !!(btCfg && btCfg.apiKey), model: btCfg ? btCfg.model : 'none', provider: btCfg ? btCfg.providerType : 'none' }));
+      console.log('PT translation config:', JSON.stringify({ hasKey: !!(_ptAdminConfig.translationLlm && _ptAdminConfig.translationLlm.apiKey), model: (_ptAdminConfig.translationLlm || {}).model }));
       if (btCfg && btCfg.apiKey) {
         // Reuse the glossary matches from the forward translation, but reversed:
         // The forward match found source-lang terms and their target-lang translations.
@@ -3320,14 +3322,16 @@ _ptRouter.post('/api/translate', async function(req, res) {
         backtranslationLlmLabel = _ptLLMLabel(btCfg);
       }
     } catch(btErr) {
-      console.error('PT: backtranslation error:', btErr.message);
+      console.error('PT: backtranslation error:', btErr.message, btErr.stack);
+      backtranslation = '[Backtranslation error: ' + btErr.message + ']';
     }
 
     return res.json({
       translation: translation,
       backtranslation: backtranslation,
+      backtranslationSkipped: !backtranslation ? 'No BT config found' : undefined,
       translationLlm: _ptLLMLabel(translationCfg),
-      backtranslationLlm: backtranslationLlmLabel,
+      backtranslationLlm: backtranslationLlmLabel || '(none)',
       glossaryMatches: glossaryMatches.length,
       tmMatches: tmMatches.length
     });
