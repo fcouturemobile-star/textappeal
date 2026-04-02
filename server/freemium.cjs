@@ -1645,15 +1645,29 @@ function registerFreemiumRoutes(app) {
     const { testEmail } = req.body;
     if (!testEmail) return res.status(400).json({ error: 'testEmail required' });
 
-    const ok = await sendEmail(
-      testEmail,
-      'Text Appeal - SMTP Test',
-      '<div style="font-family:sans-serif;padding:24px"><h2 style="color:#1e40af">SMTP is working</h2><p>This is a test email from your Text Appeal application. If you received this, your email configuration is correct.</p></div>'
-    );
-    if (ok) {
-      res.json({ ok: true, message: `Test email sent to ${testEmail}` });
-    } else {
-      res.status(500).json({ error: 'Failed to send test email. Check SMTP credentials and server logs.' });
+    try {
+      if (!nodemailer) return res.status(500).json({ error: 'nodemailer not installed on server' });
+      const smtp = getSmtpConfig();
+      if (!smtp || !smtp.host || !smtp.user || !smtp.pass) {
+        return res.status(400).json({ error: 'SMTP not fully configured. Save your SMTP settings first.' });
+      }
+      const transporter = nodemailer.createTransport({
+        host: smtp.host,
+        port: parseInt(smtp.port) || 465,
+        secure: parseInt(smtp.port) === 465,
+        auth: { user: smtp.user, pass: smtp.pass },
+        tls: { rejectUnauthorized: false }
+      });
+      await transporter.sendMail({
+        from: smtp.from || smtp.user,
+        to: testEmail,
+        subject: 'Text Appeal - SMTP Test',
+        html: '<div style="font-family:sans-serif;padding:24px"><h2 style="color:#1e40af">SMTP is working</h2><p>If you received this, your email configuration is correct.</p></div>'
+      });
+      res.json({ ok: true, message: 'Test email sent to ' + testEmail });
+    } catch (smtpErr) {
+      console.error('SMTP test error:', smtpErr.message);
+      res.status(500).json({ error: 'SMTP error: ' + smtpErr.message });
     }
   });
 }
