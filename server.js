@@ -1,4 +1,4 @@
-// Build: 2026-04-02T06:16 EDT - remove direction bar
+// Build: 2026-04-02T06:20 EDT - clickable author
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
