@@ -2987,12 +2987,21 @@ function _ptSaveConfig() {
   try {
     // Primary: save inside the main TextAppeal admin-config.json under "purpleTongue" key
     // This file is KNOWN to persist on Hostinger (TextAppeal settings survive deploys)
+    // Save PT config into the main TextAppeal admin-config.json under "purpleTongue" key.
+    // CRITICAL: read the CURRENT file, only update the purpleTongue key, preserve everything else.
     var mainCfgPath = _ptPath.join(process.env.HOME || '/tmp', '.textappeal', 'admin-config.json');
     try {
-      var mainCfg = {};
-      if (_ptFs.existsSync(mainCfgPath)) mainCfg = JSON.parse(_ptFs.readFileSync(mainCfgPath, 'utf8'));
+      // Use the main app's in-memory config (Ga()) to avoid reading a stale file
+      var mainCfg;
+      try { mainCfg = JSON.parse(JSON.stringify(Ga())); } catch(ge) { mainCfg = {}; }
+      // If Ga() returned empty, read from disk as fallback
+      if (!mainCfg || Object.keys(mainCfg).length < 2) {
+        try { mainCfg = JSON.parse(_ptFs.readFileSync(mainCfgPath, 'utf8')); } catch(re) { mainCfg = {}; }
+      }
       mainCfg.purpleTongue = _ptAdminConfig;
       _ptFs.writeFileSync(mainCfgPath, JSON.stringify(mainCfg, null, 2));
+      // Also update the in-memory main config so Ga() stays current
+      try { he = mainCfg; } catch(he2) {}
       console.log('PT: Config saved to main TextAppeal config. Translation model: ' + ((_ptAdminConfig.translationLlm || {}).model || '(not set)'));
     } catch(me) { console.error('PT: Error saving to main config:', me.message); }
 

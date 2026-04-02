@@ -1,4 +1,4 @@
-// Build: 2026-04-02T07:13 EDT - PT config in main TA file
+// Build: 2026-04-02T07:18 EDT - safe config write
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
