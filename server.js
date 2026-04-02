@@ -1,4 +1,4 @@
-// Build: 2026-04-02T07:26 EDT - PurpleTongue + disclaimers
+// Build: 2026-04-02T07:37 EDT - scrollable panes
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
