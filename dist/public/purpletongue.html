@@ -702,6 +702,8 @@ input[type="file"].pt-input { cursor: pointer; }
     <div class="pt-ui-lang-toggle">
       <button class="pt-ui-lang-btn active" data-lang="en">EN</button>
       <button class="pt-ui-lang-btn" data-lang="fr">FR</button>
+      <button class="pt-ui-lang-btn" data-lang="es">ES</button>
+      <button class="pt-ui-lang-btn" data-lang="pt">BR</button>
     </div>
     <div id="pt-user-bar">
       <div id="pt-logged-out" style="display:flex;gap:8px;">
@@ -1258,6 +1260,66 @@ var _i18n = {
     notes: 'Notes (facultatif)',
     submit_request: 'Envoyer la demande',
     back: '← Retour'
+  },
+  es: {
+    source_text: 'Texto fuente',
+    translation: 'Traducción en lenguaje claro',
+    backtranslation: 'Retrotraducción',
+    translate: 'Traducir',
+    retranslate: 'Retraducir',
+    clear: 'Borrar',
+    copy: 'Copiar',
+    login: 'Iniciar sesión',
+    register: 'Registrarse',
+    logout: 'Cerrar sesión',
+    email: 'Correo electrónico',
+    password: 'Contraseña',
+    forgot_password: '¿Olvidó su contraseña?',
+    admin: 'Admin',
+    translate_document: 'Traducir un documento',
+    privacy_note: 'Las traducciones no se almacenan. Sus datos son privados.',
+    plain_lang_mode: '· Modo lenguaje claro',
+    translation_placeholder: 'La traducción aparecerá aquí.',
+    backtranslation_placeholder: 'La retrotraducción aparece después de la traducción.',
+    document_upload: 'Solicitud de traducción de documento',
+    upload_file_label: 'Archivo (PDF, DOCX, etc.)',
+    your_name: 'Su nombre',
+    your_email: 'Correo electrónico',
+    source_language: 'Idioma de origen',
+    target_language: 'Idioma de destino',
+    notes: 'Notas (opcional)',
+    submit_request: 'Enviar solicitud',
+    back: '← Volver'
+  },
+  pt: {
+    source_text: 'Texto fonte',
+    translation: 'Tradução em linguagem simples',
+    backtranslation: 'Retrotradução',
+    translate: 'Traduzir',
+    retranslate: 'Retraduzir',
+    clear: 'Limpar',
+    copy: 'Copiar',
+    login: 'Entrar',
+    register: 'Registrar-se',
+    logout: 'Sair',
+    email: 'E-mail',
+    password: 'Senha',
+    forgot_password: 'Esqueceu a senha?',
+    admin: 'Admin',
+    translate_document: 'Traduzir um documento',
+    privacy_note: 'As traduções não são armazenadas. Seus dados são privados.',
+    plain_lang_mode: '· Modo linguagem simples',
+    translation_placeholder: 'A tradução aparecerá aqui.',
+    backtranslation_placeholder: 'A retrotradução aparece após a tradução.',
+    document_upload: 'Solicitação de tradução de documento',
+    upload_file_label: 'Arquivo (PDF, DOCX, etc.)',
+    your_name: 'Seu nome',
+    your_email: 'E-mail',
+    source_language: 'Idioma de origem',
+    target_language: 'Idioma de destino',
+    notes: 'Notas (opcional)',
+    submit_request: 'Enviar solicitação',
+    back: '← Voltar'
   }
 };
 
@@ -1273,15 +1335,16 @@ function _applyI18n() {
   document.querySelectorAll('[data-placeholder-i18n]').forEach(function(el) {
     el.setAttribute('data-placeholder', _t(el.getAttribute('data-placeholder-i18n')));
   });
-  document.title = 'Purple Tongue by François COUTURE — ' + (_uiLang === 'fr' ? 'Traduction Quadrilingue' : 'Quadrilingual Translation');
+  var _titleSuffix = { en: 'Quadrilingual Translation', fr: 'Traduction quadrilingue', es: 'Traducción cuadrilingue', pt: 'Tradução quadrilingue' };
+  document.title = 'Purple Tongue by François COUTURE — ' + (_titleSuffix[_uiLang] || _titleSuffix.en);
 }
 
 // ── Language names ─────────────────────────────────────────────────────────
 var _langNames = {
-  'en-US': { en: 'US English', fr: 'anglais américain' },
-  'fr-CA': { en: 'Canadian French', fr: 'français canadien' },
-  'es-419': { en: 'Latin-Am Spanish', fr: 'espagnol latino-américain' },
-  'pt-BR': { en: 'Brazilian Portuguese', fr: 'portugais brésilien' }
+  'en-US': { en: 'US English', fr: 'anglais américain', es: 'inglés estadounidense', pt: 'inglês americano' },
+  'fr-CA': { en: 'Canadian French', fr: 'français canadien', es: 'francés canadiense', pt: 'francês canadense' },
+  'es-419': { en: 'Latin-Am Spanish', fr: 'espagnol latino-américain', es: 'español latinoamericano', pt: 'espanhol latino-americano' },
+  'pt-BR': { en: 'Brazilian Portuguese', fr: 'portugais brésilien', es: 'portugués brasileño', pt: 'português brasileiro' }
 };
 function _langName(code) {
   return (_langNames[code] || {})[_uiLang] || code;
