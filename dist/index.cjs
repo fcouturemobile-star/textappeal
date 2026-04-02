@@ -3110,14 +3110,23 @@ function _ptBuildContext(glossaryMatches, tmMatches) {
 // ── Admin token management ────────────────────────────────────────────────
 function _ptCheckAdminToken(req) {
   var token = req.headers['x-admin-token'];
-  if (!token) return false;
-  // Allow tokens from the main app's lt map (same master admin)
-  if (typeof lt !== 'undefined' && lt.has && lt.has(token)) return true;
+  if (!token || token === 'null' || token === 'undefined' || token === '') {
+    console.warn('PT admin check: no token in request');
+    return false;
+  }
+  // Check Purple Tongue's own token map first
   if (_ptAdminTokens.has(token)) {
     var info = _ptAdminTokens.get(token);
     if (Date.now() > info.expiresAt) { _ptAdminTokens.delete(token); return false; }
     return true;
   }
+  // Also allow tokens from the main app's lt map (same master admin)
+  if (typeof lt !== 'undefined' && lt.has && lt.has(token)) {
+    var ltInfo = lt.get(token);
+    if (ltInfo && ltInfo.expiresAt && Date.now() > ltInfo.expiresAt) { lt.delete(token); return false; }
+    return true;
+  }
+  console.warn('PT admin check: token not found in any map, token starts with:', token.substring(0, 8));
   return false;
 }
 

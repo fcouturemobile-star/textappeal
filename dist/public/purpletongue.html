@@ -1771,6 +1771,9 @@ _qs('#pt-bllm-provider').addEventListener('change', function() {
 async function _loadAdminData() {
   // LLM config
   var r = await _apiAdmin('/admin/llm');
+  if (!r.ok) {
+    _showAlert(_qs('#pt-llm-alert'), 'Could not load LLM config: ' + (r.data.error || 'Error ' + r.status), 'error');
+  }
   if (r.ok && r.data) {
     var d = r.data;
     _qs('#pt-llm-provider').value = d.providerType || 'anthropic';
@@ -1826,6 +1829,7 @@ async function _loadAdminData() {
 
 // ── Save LLM ─────────────────────────────────────────────────────────────
 _qs('#pt-llm-save').addEventListener('click', async function() {
+  _showAlert(_qs('#pt-llm-alert'), '', ''); // clear previous
   var payload = {
     providerType: _qs('#pt-llm-provider').value,
     endpoint: _qs('#pt-llm-endpoint').value.trim(),

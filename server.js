@@ -1,4 +1,4 @@
-// Build: 2026-04-01T20:55 EDT - model selector + auth
+// Build: 2026-04-01T21:01 EDT - auth debug + models
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
