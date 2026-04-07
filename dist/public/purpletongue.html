@@ -2334,7 +2334,7 @@ window._ptDoForgotPassword = async function() {
     if (pw1 !== pw2) { if (msg) { msg.textContent = 'Passwords do not match.'; msg.style.color = '#fca5a5'; } return; }
     if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
     try {
-      var r = await fetch(_apiBase() + '/user/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, password: pw1 }) });
+      var r = await fetch(_apiBase() + '/user/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, newPassword: pw1 }) });
       var d = await r.json();
       if (r.ok) {
         if (title) { title.textContent = 'Password Updated!'; title.style.color = '#4ade80'; }

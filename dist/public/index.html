@@ -740,6 +740,8 @@ function __updateReactText() {
 (function(){
   if (sessionStorage.getItem("ta_splash_seen")) return;
   if (window.location.hash && window.location.hash.includes("/admin")) return;
+  // Never show splash when user is trying to reset password or verify email
+  if (window.location.hash && (window.location.hash.includes("/reset-password") || window.location.hash.includes("/verify-email"))) return;
 
   const lang = window.__taLang || localStorage.getItem("ta_lang") || "en";
 
@@ -2221,7 +2223,7 @@ async function saveTenantEmailDomain() {
       var r = await origFetch(prefix + '/api/user/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: token, password: pw1 })
+        body: JSON.stringify({ token: token, newPassword: pw1 })
       });
       var data = await r.json();
       if (r.ok) {

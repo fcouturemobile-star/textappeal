@@ -1,4 +1,4 @@
-// Build: 2026-04-07T10:01 EDT - password reset pages
+// Build: 2026-04-07T10:19 EDT - reset password newPassword fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
