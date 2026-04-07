@@ -967,7 +967,11 @@ function registerFreemiumRoutes(app) {
       await db.query('INSERT INTO password_resets (user_id, token, expires_at) VALUES (?, ?, ?)', [users[0].id, resetToken, expiresAt]);
 
       const baseUrl = req.headers.origin || `${req.protocol}://${req.headers.host}`;
-      const resetLink = `${baseUrl}/#/reset-password?token=${resetToken}`;
+      // Include tenant path so the reset link opens the right app
+      const tenantPath = users[0].tenant ? '/' + users[0].tenant : '';
+      // Special case: PURPLETONGUE uses /purpletongue path
+      const appPath = users[0].tenant === 'PURPLETONGUE' ? '/purpletongue' : tenantPath;
+      const resetLink = `${baseUrl}${appPath}/#/reset-password?token=${resetToken}`;
       console.log(`[Password Reset] User: ${users[0].email}, Link: ${resetLink}`);
 
       // Send reset email via SMTP

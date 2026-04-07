@@ -2264,6 +2264,100 @@ _qs('#pt-upload-submit').addEventListener('click', async function() {
 });
 
 // ── Admin link in footer ──────────────────────────────────────────────────
+// ── Forgot Password ──────────────────────────────────────────────────────────
+_qs('#pt-forgot-link').addEventListener('click', function(e) {
+  e.preventDefault();
+  var email = (_qs('#pt-login-email') || {}).value || '';
+  var overlay = document.createElement('div');
+  overlay.id = 'pt-forgot-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:99999';
+  overlay.innerHTML =
+    '<div style="background:#1e293b;border-radius:12px;padding:28px 32px;max-width:380px;width:90%;color:#e2e8f0;position:relative">' +
+    '<button onclick="document.getElementById(\'pt-forgot-overlay\').remove()" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer">&times;</button>' +
+    '<h3 style="margin:0 0 12px;font-size:17px;color:#f1f5f9">Forgot Password</h3>' +
+    '<p style="font-size:13px;color:#94a3b8;margin:0 0 14px">Enter your email and we\'ll send a reset link.</p>' +
+    '<div id="pt-forgot-msg" style="display:none;padding:8px 12px;border-radius:6px;margin-bottom:10px;font-size:13px"></div>' +
+    '<input id="pt-forgot-email" type="email" placeholder="your@email.com" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:14px;box-sizing:border-box">' +
+    '<button onclick="window._ptDoForgotPassword()" style="width:100%;padding:10px;border-radius:6px;border:none;background:#FF6600;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Send Reset Link</button>' +
+    '</div>';
+  overlay.querySelector('#pt-forgot-email') && (overlay.querySelector('#pt-forgot-email').value = email);
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', function(ev) { if (ev.target === overlay) overlay.remove(); });
+  setTimeout(function() { var el = document.getElementById('pt-forgot-email'); if (el) el.focus(); }, 100);
+});
+
+window._ptDoForgotPassword = async function() {
+  var email = (document.getElementById('pt-forgot-email') || {}).value || '';
+  var msgEl = document.getElementById('pt-forgot-msg');
+  function showMsg(txt, isErr) { if (msgEl) { msgEl.textContent = txt; msgEl.style.display = 'block'; msgEl.style.background = isErr ? '#7f1d1d' : '#14532d'; msgEl.style.color = isErr ? '#fca5a5' : '#86efac'; } }
+  if (!email) return showMsg('Please enter your email.', true);
+  try {
+    var r = await fetch(_apiBase() + '/user/forgot-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) });
+    var d = await r.json();
+    showMsg(d.message || 'Reset link sent. Check your inbox.', false);
+  } catch(e) { showMsg('Error: ' + e.message, true); }
+};
+
+// ── Password Reset hash handler ──────────────────────────────────────────────
+(function() {
+  function handleResetHash() {
+    var hash = window.location.hash;
+    if (!hash.startsWith('#/reset-password')) return;
+    var params = new URLSearchParams(hash.replace('#/reset-password', '').replace('?', ''));
+    var token = params.get('token');
+    if (!token) return;
+    var overlay = document.createElement('div');
+    overlay.id = 'pt-reset-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999999';
+    var tokenSafe = token.replace(/'/g, "\'");
+    overlay.innerHTML =
+      '<div style="background:#1e293b;border-radius:12px;padding:28px 32px;max-width:400px;width:90%;color:#e2e8f0;text-align:center;position:relative">' +
+      '<button onclick="document.getElementById(\'pt-reset-overlay\').remove();window.location.hash=\'\'" style="position:absolute;top:10px;right:14px;background:none;border:none;color:#94a3b8;font-size:20px;cursor:pointer">&times;</button>' +
+      '<div style="font-size:36px;margin-bottom:12px">&#x1f512;</div>' +
+      '<h2 id="pt-reset-title" style="color:#FF6600;margin:0 0 8px;font-size:18px">Reset Your Password</h2>' +
+      '<p id="pt-reset-msg" style="color:#94a3b8;margin:0 0 20px;font-size:13px">Enter your new password below.</p>' +
+      '<input id="pt-reset-pw1" type="password" placeholder="New password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:10px;box-sizing:border-box">' +
+      '<input id="pt-reset-pw2" type="password" placeholder="Confirm password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:16px;box-sizing:border-box">' +
+      '<button id="pt-reset-btn" onclick="window._ptDoResetPassword('' + tokenSafe + '')" style="width:100%;padding:10px;border-radius:6px;border:none;background:#FF6600;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Save New Password</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    setTimeout(function() { var el = document.getElementById('pt-reset-pw1'); if (el) el.focus(); }, 100);
+  }
+
+  window._ptDoResetPassword = async function(token) {
+    var pw1 = (document.getElementById('pt-reset-pw1') || {}).value || '';
+    var pw2 = (document.getElementById('pt-reset-pw2') || {}).value || '';
+    var title = document.getElementById('pt-reset-title');
+    var msg = document.getElementById('pt-reset-msg');
+    var btn = document.getElementById('pt-reset-btn');
+    if (pw1.length < 6) { if (msg) { msg.textContent = 'Password must be at least 6 characters.'; msg.style.color = '#fca5a5'; } return; }
+    if (pw1 !== pw2) { if (msg) { msg.textContent = 'Passwords do not match.'; msg.style.color = '#fca5a5'; } return; }
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    try {
+      var r = await fetch(_apiBase() + '/user/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token, password: pw1 }) });
+      var d = await r.json();
+      if (r.ok) {
+        if (title) { title.textContent = 'Password Updated!'; title.style.color = '#4ade80'; }
+        if (msg) { msg.textContent = 'You can now log in with your new password.'; msg.style.color = '#94a3b8'; }
+        if (btn) { btn.textContent = 'Go to Login'; btn.disabled = false; btn.onclick = function() { var ov = document.getElementById('pt-reset-overlay'); if (ov) ov.remove(); window.location.hash = ''; document.getElementById('pt-login-btn') && document.getElementById('pt-login-btn').click(); }; }
+      } else {
+        if (msg) { msg.textContent = d.error || 'Invalid or expired reset link.'; msg.style.color = '#fca5a5'; }
+        if (btn) { btn.disabled = false; btn.textContent = 'Save New Password'; }
+      }
+    } catch(e) {
+      if (msg) { msg.textContent = 'Error: ' + e.message; msg.style.color = '#fca5a5'; }
+      if (btn) { btn.disabled = false; }
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleResetHash);
+  } else {
+    handleResetHash();
+  }
+  window.addEventListener('hashchange', handleResetHash);
+})();
+
 document.querySelector('footer a[href="#/admin"]').addEventListener('click', function(e) {
   e.preventDefault();
   window.location.hash = '#/admin';

@@ -2180,6 +2180,72 @@ async function saveTenantEmailDomain() {
   window.addEventListener('hashchange', handleVerifyEmailHash);
 })();
 
+// ══ Password Reset hash handler ══
+(function() {
+  function handleResetPasswordHash() {
+    var hash = window.location.hash;
+    if (!hash.startsWith('#/reset-password')) return;
+    var params = new URLSearchParams(hash.replace('#/reset-password', '').replace('?', ''));
+    var token = params.get('token');
+    if (!token) return;
+    var L = window.__taLang || 'en';
+    var overlay = document.createElement('div');
+    overlay.id = 'ta-reset-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:999999';
+    overlay.innerHTML =
+      '<div style="background:#fff;border-radius:12px;padding:32px;max-width:420px;width:90%;text-align:center;position:relative">' +
+      '<button onclick="document.getElementById(\'ta-reset-overlay\').remove();window.location.hash=\'\';" style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#94a3b8">&times;</button>' +
+      '<div style="font-size:36px;margin-bottom:12px">&#x1f512;</div>' +
+      '<h2 id="ta-reset-title" style="color:#1e40af;margin:0 0 8px">' + (L==='fr' ? 'R\u00e9initialiser le mot de passe' : 'Reset Your Password') + '</h2>' +
+      '<p id="ta-reset-msg" style="color:#64748b;margin:0 0 20px;font-size:14px">' + (L==='fr' ? 'Entrez votre nouveau mot de passe.' : 'Enter your new password below.') + '</p>' +
+      '<input id="ta-reset-pw1" type="password" placeholder="' + (L==='fr' ? 'Nouveau mot de passe' : 'New password') + '" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;margin-bottom:10px;box-sizing:border-box">' +
+      '<input id="ta-reset-pw2" type="password" placeholder="' + (L==='fr' ? 'Confirmer le mot de passe' : 'Confirm password') + '" style="width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px;margin-bottom:16px;box-sizing:border-box">' +
+      '<button id="ta-reset-btn" onclick="window.__doResetPassword(\''+token+'\')" style="width:100%;padding:11px;background:#2563eb;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer">' + (L==='fr' ? 'Enregistrer' : 'Save New Password') + '</button>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    setTimeout(function() { var el = document.getElementById('ta-reset-pw1'); if (el) el.focus(); }, 100);
+  }
+
+  window.__doResetPassword = async function(token) {
+    var pw1 = (document.getElementById('ta-reset-pw1') || {}).value || '';
+    var pw2 = (document.getElementById('ta-reset-pw2') || {}).value || '';
+    var L = window.__taLang || 'en';
+    var title = document.getElementById('ta-reset-title');
+    var msg = document.getElementById('ta-reset-msg');
+    var btn = document.getElementById('ta-reset-btn');
+    if (pw1.length < 6) { if (msg) { msg.textContent = L==='fr' ? 'Le mot de passe doit contenir au moins 6 caract\u00e8res.' : 'Password must be at least 6 characters.'; msg.style.color = '#dc2626'; } return; }
+    if (pw1 !== pw2) { if (msg) { msg.textContent = L==='fr' ? 'Les mots de passe ne correspondent pas.' : 'Passwords do not match.'; msg.style.color = '#dc2626'; } return; }
+    if (btn) { btn.disabled = true; btn.textContent = L==='fr' ? 'Enregistrement...' : 'Saving...'; }
+    try {
+      var prefix = window.__tenantApiPrefix || '';
+      var r = await origFetch(prefix + '/api/user/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: token, password: pw1 })
+      });
+      var data = await r.json();
+      if (r.ok) {
+        if (title) { title.textContent = L==='fr' ? 'Mot de passe modifi\u00e9\u00a0!' : 'Password Updated!'; title.style.color = '#059669'; }
+        if (msg) { msg.textContent = L==='fr' ? 'Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.' : 'You can now log in with your new password.'; msg.style.color = '#64748b'; }
+        if (btn) { btn.textContent = L==='fr' ? 'Se connecter' : 'Go to Login'; btn.disabled = false; btn.onclick = function() { var ov = document.getElementById('ta-reset-overlay'); if (ov) ov.remove(); window.location.hash = ''; window.__taFreemium && window.__taFreemium.showAuthModal('login'); }; }
+      } else {
+        if (msg) { msg.textContent = data.error || (L==='fr' ? 'Lien invalide ou expir\u00e9.' : 'Invalid or expired reset link.'); msg.style.color = '#dc2626'; }
+        if (btn) { btn.disabled = false; btn.textContent = L==='fr' ? 'Enregistrer' : 'Save New Password'; }
+      }
+    } catch(e) {
+      if (msg) { msg.textContent = 'Error: ' + e.message; msg.style.color = '#dc2626'; }
+      if (btn) { btn.disabled = false; }
+    }
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', handleResetPasswordHash);
+  } else {
+    handleResetPasswordHash();
+  }
+  window.addEventListener('hashchange', handleResetPasswordHash);
+})();
+
 async function showStripePanel() {
   const adminToken = getAdminToken();
   if (!adminToken) return;
