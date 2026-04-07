@@ -2318,9 +2318,11 @@ window._ptDoForgotPassword = async function() {
       '<p id="pt-reset-msg" style="color:#94a3b8;margin:0 0 20px;font-size:13px">Enter your new password below.</p>' +
       '<input id="pt-reset-pw1" type="password" placeholder="New password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:10px;box-sizing:border-box">' +
       '<input id="pt-reset-pw2" type="password" placeholder="Confirm password" style="width:100%;padding:9px 12px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;margin-bottom:16px;box-sizing:border-box">' +
-      '<button id="pt-reset-btn" onclick="window._ptDoResetPassword('' + tokenSafe + '')" style="width:100%;padding:10px;border-radius:6px;border:none;background:#FF6600;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Save New Password</button>' +
+      '<button id="pt-reset-btn" style="width:100%;padding:10px;border-radius:6px;border:none;background:#FF6600;color:#fff;font-size:14px;font-weight:600;cursor:pointer">Save New Password</button>' +
       '</div>';
     document.body.appendChild(overlay);
+    var btn = document.getElementById('pt-reset-btn');
+    if (btn) btn.addEventListener('click', function() { window._ptDoResetPassword(token); });
     setTimeout(function() { var el = document.getElementById('pt-reset-pw1'); if (el) el.focus(); }, 100);
   }
 

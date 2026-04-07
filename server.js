@@ -1,4 +1,4 @@
-// Build: 2026-04-07T10:19 EDT - reset password newPassword fix
+// Build: 2026-04-07T10:28 EDT - PT admin syntax fix
 import { createRequire } from "module";
 const require = createRequire(import.meta.url);
 process.env.NODE_ENV = "production";
